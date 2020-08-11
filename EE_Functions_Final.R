@@ -743,7 +743,7 @@ env_eb$prep_file <- function(idtaskdep, indcode_list, train = TRUE) {
   start <- sapply(1:max(idtask_r), function(i){
     min(which(i == idtask_r))})
 
-  return(list(N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
+  return(list(tag = NULL, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
               dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
               task_individual = match_id[start],
               start = start,
