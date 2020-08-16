@@ -747,7 +747,7 @@ env_eb$prep_file <- function(idtaskdep, indcode_list, train = TRUE) {
               dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
               task_individual = match_id[start],
               start = start,
-              end = c(start[-1], nrow(ind)),
+              end = c(start[-1] - 1, nrow(ind)),
               prior_cov = indcode_list$indprior,
               code_master = indcode_list$code_master,
               wts = wts))
