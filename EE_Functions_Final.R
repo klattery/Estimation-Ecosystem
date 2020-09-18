@@ -740,10 +740,12 @@ env_eb$prep_file <- function(idtaskdep, indcode_list, train = TRUE) {
   wts <- rep(1, length(dep))
   
   # Add Stan stuff
-  start <- sapply(1:max(idtask_r), function(i){
-    min(which(i == idtask_r))})
-  end = sapply(1:max(idtask_r), function(i){
-                max(which(i == idtask_r))})
+  end <- c(which(diff(idtask_r)!=0), length(idtask_r))
+  start <- c(1, end[-length(idtask_r)]+1)
+  #start <- sapply(1:max(idtask_r), function(i){
+  #  min(which(i == idtask_r))})
+  #end = sapply(1:max(idtask_r), function(i){
+  #              max(which(i == idtask_r))})
 
   return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
               dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
