@@ -741,7 +741,7 @@ env_eb$prep_file <- function(idtaskdep, indcode_list, train = TRUE) {
   
   # Add Stan stuff
   end <- c(which(diff(idtask_r)!=0), length(idtask_r))
-  start <- c(1, end[-length(idtask_r)]+1)
+  start <- c(1, end[-length(end)]+1)
   #start <- sapply(1:max(idtask_r), function(i){
   #  min(which(i == idtask_r))})
   #end = sapply(1:max(idtask_r), function(i){
