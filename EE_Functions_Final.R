@@ -500,6 +500,7 @@ env_eb$mleb <- function(data_list, model_list, mleb_control){
       
       model_env$prior$alpha <- alpha_r
       model_env$prior$scale <- 1 # set to 1 just for cleanliness
+      model_env$x0 <- alpha_r # Update x0 to match alpha (Nov 2020)
       save(mleb_result, file = file.path(mleb_control$dir_pdf, "mleb_result.RData"), envir = model_env)
  
       # print
