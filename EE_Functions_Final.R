@@ -418,8 +418,9 @@ env_eb$mleb <- function(data_list, model_list, mleb_control){
   model_env$mleb_result$model_list <- model_list
   
   if (mleb_control$solveonly) {
-    eb_betas <- lapply(1:length(data_list$resp_id), function(x)
-      SolveID(idseq = x, data_list=data_list, model_env = model_env))
+    eb_betas <- foreach(i = 1:length(data_list$resp_id), .combine = list,.multicombine = TRUE, .maxcombine = 99999999) %dopar% {
+        result <- model_env$SolveID(idseq = i, data_list=data_list, model_env = model_env)
+        result}                   
     model_env$mleb_result$eb_betas <- do.call(rbind, lapply(eb_betas, function(x) x$betas))
     model_env$mleb_result$predprob <- do.call(rbind, lapply(eb_betas, function(x) x$predprob))
     colnames( model_env$mleb_result$predprob) <- c("id", "task", "est", "pred", "dep", "wt")
@@ -500,6 +501,7 @@ env_eb$mleb <- function(data_list, model_list, mleb_control){
       
       model_env$prior$alpha <- alpha_r
       model_env$prior$scale <- 1 # set to 1 just for cleanliness
+      model_env$x0 <- alpha_r # Update x0 to match alpha (Nov 2020)
       save(mleb_result, file = file.path(mleb_control$dir_pdf, "mleb_result.RData"), envir = model_env)
  
       # print
