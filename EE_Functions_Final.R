@@ -418,8 +418,8 @@ env_eb$mleb <- function(data_list, model_list, mleb_control){
   model_env$mleb_result$model_list <- model_list
   
   if (mleb_control$solveonly) {
-    eb_betas <- lapply(1:length(data_list$resp_id), function(x)
-      SolveID(idseq = x, data_list=data_list, model_env = model_env))
+    eb_betas <- foreach(i = 1:length(data_list$resp_id), .combine = list,.multicombine = TRUE) %dopar% {
+        SolveID(idseq = i, data_list=data_list, model_env = model_env)}                   
     model_env$mleb_result$eb_betas <- do.call(rbind, lapply(eb_betas, function(x) x$betas))
     model_env$mleb_result$predprob <- do.call(rbind, lapply(eb_betas, function(x) x$predprob))
     colnames( model_env$mleb_result$predprob) <- c("id", "task", "est", "pred", "dep", "wt")
