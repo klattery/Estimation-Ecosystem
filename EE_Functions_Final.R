@@ -103,7 +103,15 @@ env_code$ordmatrix <- function(num_levels) {
   return(ord_matrix / num_levels)
 }
 
-env_code$ordcode <- function(kdata, kcol, cut_pts, varout = NULL, setna = 0) {
+env_code$ordmatrix2 <- function(num_levels) {
+  ord_matrix <- matrix(0,num_levels-1, num_levels-1)
+  ord_matrix <- diag(num_levels-1)
+  ord_matrix[lower.tri(ord_matrix)] <- 1
+  ord_matrix <- rbind(rep(0, ncol(ord_matrix)), ord_matrix)
+  return(ord_matrix)
+}
+
+env_code$ordcode <- function(kdata, kcol, cut_pts, thermcode = TRUE, varout = NULL, setna = 0) {
   # xvec must be vector
   # cut_pts must be sequential vector from low to high
   # NA and values outside cut_pts are set to "setna", default = 0
@@ -131,7 +139,9 @@ env_code$ordcode <- function(kdata, kcol, cut_pts, varout = NULL, setna = 0) {
   mat_low[cbind(1:length(xvec),low_col)] <- dist1 
   mat_high[cbind(1:length(xvec),high_col)] <- dist2 
   rowcode <- mat_low + mat_high
-  code_matrix <- ordmatrix(length(cut_pts))
+  if (thermcode){
+    code_matrix <- ordmatrix2(length(cut_pts))
+  } else code_matrix <- ordmatrix(length(cut_pts))
   ordcode <- round(rowcode %*% code_matrix, 5)
   ordcode[bad] <- setna # reset initial NA (default 0)
   vnames <- unlist(lapply(2:length(cut_pts), function(i) paste0(varout, "_",cut_pts[i-1],"_", cut_pts[i])))
