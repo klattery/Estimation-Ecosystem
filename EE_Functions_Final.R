@@ -147,7 +147,13 @@ env_code$ordcode <- function(kdata, kcol, cut_pts, thermcode = TRUE, varout = NU
   vnames <- unlist(lapply(2:length(cut_pts), function(i) paste0(varout, "_",cut_pts[i-1],"_", cut_pts[i])))
   colnames(ordcode) <- vnames
   varnames <- paste0(varout, "_", cut_pts)
-  return(list(outcode = ordcode, code_matrix = code_matrix, vnames = varnames, prior = diag(ncol(code_matrix))))
+  nlev <- length(cut_pts)
+  prior_code <- diag(nlev -1) * 0
+  neg <- diag(nlev -2) * -1
+  prior_code[(2:(nlev-1)),(1:(nlev-2))] <- neg
+  prior_code <- prior_code + t(prior_code)
+  diag(prior_code) <- 2
+  return(list(outcode = ordcode, code_matrix = code_matrix, vnames = varnames, prior = prior_code))
 }
 
 env_code$setup_cores <- function(ncores){
