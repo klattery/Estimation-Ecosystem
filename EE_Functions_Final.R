@@ -733,11 +733,11 @@ env_eb$best_x_fromy <- function(x, y) {
 }
 
 ###############  General Prep ###############
-env_eb$prep_file <- function(idtaskdep, indcode_list, train = TRUE) {
+env_eb$prep_file <- function(idtaskdep, indcode_list, train = TRUE, other_data = NULL) {
   sort_order <- order(idtaskdep[, 1], idtaskdep[, 2])
   sort_order[!train] <- 0 # Non-training gets order = 0, which removes
   ind <- as.matrix(indcode_list$indcode[sort_order,])
-  ind[is.na(ind)] <- 0
+  
   dep <- as.vector(as.matrix(idtaskdep[sort_order, 3]))
   idtask <- data.frame(idtaskdep[sort_order, 1:2])
   idtask_u <- as.matrix(unique(idtask))
@@ -748,26 +748,36 @@ env_eb$prep_file <- function(idtaskdep, indcode_list, train = TRUE) {
   depsum <- rowsum(dep, idtask_r) # Sum dep each task
   depsum_match <- (depsum[idtask_r,]) # Map Sum to rows
   dep <- dep / depsum_match # sum of dep will add to 1
+  # Recode NAs to 0
+  ind[is.na(ind)] <- 0
   dep[is.na(dep)] <- 0
-  wts <- rep(1, length(dep))
+  wts <- rep(1, length(dep)) # initial weights are 1
   
   # Add Stan stuff
   end <- c(which(diff(idtask_r)!=0), length(idtask_r))
   start <- c(1, end[-length(end)]+1)
-  #start <- sapply(1:max(idtask_r), function(i){
-  #  min(which(i == idtask_r))})
-  #end = sapply(1:max(idtask_r), function(i){
-  #              max(which(i == idtask_r))})
-
-  return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
-              dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
-              task_individual = match_id[start],
-              start = start,
-              end = end,
-              prior_cov = indcode_list$indprior,
-              code_master = indcode_list$code_master,
-              wts = wts))
-}
+  # Return list of data (depends on whether other data was also chosen)
+  if (!is.null(other_data)){
+    return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
+                dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
+                task_individual = match_id[start],
+                start = start,
+                end = end,
+                prior_cov = indcode_list$indprior,
+                code_master = indcode_list$code_master,
+                wts = wts,
+                other_data = other_data[sort_order,])) # Only Added item in list vs below
+  } else {
+    return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
+                dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
+                task_individual = match_id[start],
+                start = start,
+                end = end,
+                prior_cov = indcode_list$indprior,
+                code_master = indcode_list$code_master,
+                wts = wts))
+    }  
+  }
 
 env_eb$con_trivial <- function(num_par, umin = -999){
   # Make trivial constraint: first util > -999
