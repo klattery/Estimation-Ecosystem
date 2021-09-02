@@ -121,8 +121,7 @@ env_code$ordcode <- function(kdata, kcol, cut_pts, thermcode = TRUE, varout = NU
     varout <- colnames(kdata)[kcol]
     if (is.null(varout)) varout <- "O"
   }
-  #xvec <- as.vector(as.matrix(kdata)[,kcol])
-  xvec <- kdata[,kcol]
+  xvec <- kdata[,kcol, drop = TRUE] # Added drop because of tibbles
   bad <- xvec < min(cut_pts) | xvec > max(cut_pts) | is.na(xvec)
   xvec[bad] <- min(cut_pts) # temp set to min
   high <- sapply(cut_pts, function(x) xvec <= x)
