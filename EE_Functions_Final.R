@@ -765,7 +765,7 @@ env_eb$prep_file <- function(idtaskdep, indcode_list, train = TRUE, other_data =
                 prior_cov = indcode_list$indprior,
                 code_master = indcode_list$code_master,
                 wts = wts,
-                other_data = other_data[sort_order,])) # Only Added item in list vs below
+                other_data = as.matrix(other_data)[sort_order,])) # Only Added item in list vs below
   } else {
     return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
                 dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
