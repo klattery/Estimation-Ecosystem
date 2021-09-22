@@ -54,7 +54,10 @@ env_code$catcode <- function(kdata, kcol, codetype = 3, varout = NULL, reflev = 
     outcode <- (code_matrix[newval,TRUE,drop = FALSE])
   }
   outcode[na_vals,] <- setna
-  if (numlevs <= 2) prior <- matrix(1)
+  if (numlevs <= 2){
+    if (codetype == 1) prior <- diag(numlevs)    
+    if (codetype > 1) prior <- matrix(1)    
+  } 
   if (numlevs >= 3) {
     if (codetype == 1){ # ind
       prior <- diag(numlevs)
