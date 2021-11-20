@@ -176,7 +176,7 @@ env_code$list_to_matrix <- function(klist){
 } 
 
 env_code$make_codefiles <- function(indcode_list){
-  # Makes vars:  # code_master, indcode, indprior
+  # Converts list of codes to matrices:  # code_master, indcode, indprior
   result <- list()
   result$indcode <- do.call(cbind, lapply(indcode_list, function(x) x$outcode)) # coded variables 
   result$con <- do.call(c, lapply(indcode_list, function(x) x$con))
