@@ -61,6 +61,7 @@ env_code$catcode <- function(kdata, vname, codetype = 3, varout = NULL, reflev =
       code_matrix <- cat_con$code_matrix
       con_vec <- cat_con$con
       reflev <- cat_con$reflev
+      pairs_add <- cat_con$pairs_add
       colnames(code_matrix) <- varnames[-reflev]
     }  
     outcode <- (code_matrix[newval,TRUE,drop = FALSE])
@@ -87,7 +88,7 @@ env_code$catcode <- function(kdata, vname, codetype = 3, varout = NULL, reflev =
       }
     }
   } else prior <- diag(ncol(code_matrix))
-  return(list(outcode = outcode, code_matrix = code_matrix, con_vec = con_vec, vnames = varnames, reflev = reflev, prior = prior))
+  return(list(outcode = outcode, code_matrix = code_matrix, con_sign = con_vec, vnames = varnames, reflev = reflev, prior = prior))
 }
 
 env_code$remove_implicits<-function(constraints){
@@ -202,7 +203,7 @@ env_code$code_cat_wcon <-function(constraints, numlevs){
   reflev=match(max(kolsum),kolsum)
   X<-X[,-reflev]
   con<-con[-reflev]
-  return(list(code_matrix=X,con=con,missing=missing, reflev = reflev))
+  return(list(code_matrix=X,con=con,pairs_add=missing, reflev = reflev))
 }
 
 
@@ -335,11 +336,11 @@ env_code$indcode_spec_get <- function(data_in, att_coding,constraints){
       }
       if (att_type == "ORDINAL"){
         indcode_spec[[i]] <- ordcode(data_in, att_name)
-        indcode_spec[[i]]$con_vec <- rep(att_coding[i,3], ncol(indcode_spec[[i]]$code_matrix))  
+        indcode_spec[[i]]$con_sign <- rep(att_coding[i,3], ncol(indcode_spec[[i]]$code_matrix))  
       }
       if (att_type == "USERSPECIFIED"){
         indcode_spec[[i]] <- usercode1(data_in, att_name)
-        indcode_spec[[i]]$con_vec <- att_coding[i,3]
+        indcode_spec[[i]]$con_sign <- att_coding[i,3]
       }
     }  
     indcode_spec <- setNames(indcode_spec,att_coding[,1,drop = TRUE])
@@ -368,7 +369,7 @@ env_code$make_codefiles <- function(indcode_list){
   indcode_list <- indcode_list[sapply(indcode_list, length) > 0] # remove NULL elements
   names(indcode_list) <- NULL
   result$indcode <- do.call(cbind, lapply(indcode_list, function(x) x$outcode)) # coded variables 
-  result$con <- do.call(c, lapply(indcode_list, function(x) x$con))
+  result$con_sign <- do.call(c, lapply(indcode_list, function(x) x$con_sign))
   result$code_master <- list_to_matrix(lapply(indcode_list, function(x) x$code_matrix))
   result$indprior <- list_to_matrix(lapply(indcode_list, function(x) x$prior))
   colnames(result$code_master) <- colnames(result$indcode) 
