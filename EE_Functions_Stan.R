@@ -65,7 +65,10 @@ env_code$catcode <- function(kdata, vname, codetype = 3, varout = NULL, reflev =
       colnames(code_matrix) <- varnames[-reflev]
     }  
     outcode <- (code_matrix[newval,TRUE,drop = FALSE])
-    if (is.null(paircon)) con_vec <- rep(0, ncol(code_matrix))
+    if (is.null(paircon)){
+      con_vec <- rep(0, ncol(code_matrix))
+      pairs_add <- NULL
+    } 
   }
   outcode[na_vals,] <- setna
   # Now get priors
@@ -88,7 +91,7 @@ env_code$catcode <- function(kdata, vname, codetype = 3, varout = NULL, reflev =
       }
     }
   } else prior <- diag(ncol(code_matrix))
-  return(list(outcode = outcode, code_matrix = code_matrix, con_sign = con_vec, vnames = varnames, reflev = reflev, prior = prior))
+  return(list(outcode = outcode, code_matrix = code_matrix, con_sign = con_vec, vnames = varnames, reflev = reflev, prior = prior, pairs_add = pairs_add))
 }
 
 env_code$remove_implicits<-function(constraints){
