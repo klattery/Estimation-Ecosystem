@@ -15,15 +15,24 @@ env_modfun <- new.env(parent = emptyenv())
 env_eb <- new.env(parent = emptyenv())
 
 ###############  Coding Functions Environment ################ 
-env_code$catcode <- function(kdata, kcol, codetype = 3, varout = NULL, reflev = NULL, setna = 0, priorcode = c(0, NA)) {
-  #colvec may be vector or nx1 matrix
-  #codetype 1 = indicator, 2= dummy, 3 = effects
-  #reflev of NULL defaults to last level
-  if (is.null(varout)){
-    varout <- colnames(kdata)[kcol]
-    if (is.null(varout)) varout <- paste0("V", kcol)
+env_code$setup_cores <- function(ncores){
+  if (file.exists(".GlobalEnv$k_multi_core")){
+    stopCluster(.GlobalEnv$k_multi_core)
+    remove(.GlobalEnv$k_multi_core)
   }
-  colvec <- kdata[,kcol, drop = TRUE] # drop = TRUE to deal with tibbles
+  if (ncores >= 1){
+    .GlobalEnv$k_multi_core <- makeCluster(min(ncores,detectCores()))
+    registerDoParallel(.GlobalEnv$k_multi_core)
+  } else {
+    message(" No parallel threads. Setting ncores < 1 removes parallel threads ")
+  }
+}
+
+env_code$catcode <- function(kdata, vname, codetype = 3, varout = NULL, reflev = NULL, setna = 0, priorcode = c(0, NA), paircon = NULL) {
+  #codetype 1 = indicator, 2= dummy, 3 = effects
+  #reflev of NULL defaults to most shown level
+  colvec <- kdata[, colnames(kdata) == vname, drop = TRUE] # drop = TRUE to deal with tibbles
+  if (is.null(varout)) varout <- vname
   colvec[colvec == priorcode[1]] <- priorcode[2]
   na_vals <- is.na(colvec)
   kmax <- max(colvec, na.rm = TRUE)
@@ -32,42 +41,170 @@ env_code$catcode <- function(kdata, kcol, codetype = 3, varout = NULL, reflev = 
   newval <- match(colvec,labels_in)
   varnames <- paste(varout,labels_in, sep = "_")
   numlevs <- length(labels_in)
-  if (is.null(reflev)) {reflev <- numlevs}
   if (numlevs == 1){
     outcode <- as.matrix(colvec) # no coding for 1 level
     code_matrix <- as.matrix(1)
     colnames(code_matrix) <- varnames
   } 
   if (numlevs >= 2) {
-    data_re <- newval
-    code_matrix <- diag(numlevs)
-    colnames(code_matrix) <- varnames
-    if (codetype %in% c(2, 3)) {
-      code_matrix <- as.matrix(code_matrix[, -reflev, drop = FALSE]) # ref lev col dropped  
-    }
-    if (codetype == 3) { code_matrix[reflev,] <- -1 }
+    if (is.null(paircon)){
+      code_matrix <- diag(numlevs)
+      colnames(code_matrix) <- varnames
+      if (is.null(reflev)){ # set to level with highest shows
+        shows <- colSums(code_matrix[newval,TRUE,drop = FALSE])
+        reflev <- match(max(shows), shows)
+      } 
+      if (codetype %in% c(2, 3))code_matrix <- as.matrix(code_matrix[, -reflev, drop = FALSE]) # ref lev col dropped
+      if (codetype == 3) code_matrix[reflev,] <- -1
+    } else { # we have constraints
+      cat_con <- code_cat_wcon(paircon,numlevs)
+      code_matrix <- cat_con$code_matrix
+      con_vec <- cat_con$con
+      reflev <- cat_con$reflev
+      colnames(code_matrix) <- varnames[-reflev]
+    }  
     outcode <- (code_matrix[newval,TRUE,drop = FALSE])
+    if (is.null(paircon)) con_vec <- rep(0, ncol(code_matrix))
   }
   outcode[na_vals,] <- setna
-  if (numlevs <= 2){
-    if (codetype == 1) prior <- diag(numlevs)    
-    if (codetype > 1) prior <- matrix(1)    
-  } 
-  if (numlevs >= 3) {
-    if (codetype == 1){ # ind
-      prior <- diag(numlevs)
+  # Now get priors
+  if (is.null(paircon)){
+    if (numlevs <= 2){
+      if (codetype == 1) prior <- diag(numlevs)    
+      if (codetype > 1) prior <- matrix(1)    
+    } 
+    if (numlevs >= 3) {
+      if (codetype == 1){ # ind
+        prior <- diag(numlevs)
+      }
+      if (codetype == 2){ # dummy
+        prior <- matrix(1, nrow = numlevs-1, ncol = numlevs-1) # off-diagonal
+        diag(prior) <- 2
+      }
+      if (codetype == 3){ #effects
+        prior <- matrix(-1/numlevs, nrow = numlevs-1, ncol = numlevs-1) # off-diagonal
+        diag(prior) <- (numlevs -1)/numlevs
+      }
     }
-    if (codetype == 2){ # dummy
-      prior <- matrix(1, nrow = numlevs-1, ncol = numlevs-1) # off-diagnol
-      diag(prior) <- 2
-    }
-    if (codetype == 3){ #effects
-      prior <- matrix(-1/numlevs, nrow = numlevs-1, ncol = numlevs-1) # off-diagnol
-      diag(prior) <- (numlevs -1)/numlevs
+  } else prior <- diag(ncol(code_matrix))
+  return(list(outcode = outcode, code_matrix = code_matrix, con_vec = con_vec, vnames = varnames, reflev = reflev, prior = prior))
+}
+
+env_code$remove_implicits<-function(constraints){
+  result <- c()
+  for (c in 1:nrow(constraints)){
+    att = constraints[c,1]
+    A = constraints[c,2]
+    B = constraints[c,3]
+    if(!(isImplicit(constraints, c, att, A, B))){
+      result<-rbind(result,constraints[c,])
     }
   }
-  return(list(outcode = outcode, code_matrix = code_matrix, vnames = varnames, prior = prior))
+  return(result)
 }
+env_code$isImplicit <-function(constraints,conrow, att, A, B){
+  nrofcons = nrow(constraints)
+  vlag <- FALSE
+  for (c in 1:nrofcons){
+    if(constraints[c, 1] == att && constraints[c, 3] == B && c != conrow){ 
+      bnew <- constraints[c, 2]
+      if(A == bnew){
+        vlag <- TRUE
+        return(vlag)
+      } else {
+        vlag <- isImplicit(constraints,c, att, A, bnew)
+      } 
+    }
+  }
+  return(vlag)
+}
+
+env_code$ordinal_chain <-function(constraints){
+  result <- list()
+  nrofcons <- nrow(constraints)
+  i <- 0
+  nrDone <- 0
+  while (nrDone < nrofcons){
+    startFound <- FALSE
+    for (lvl in unique(constraints[,2])){
+      if(sum(constraints[,2]==lvl) > 0 && sum(constraints[,3]==lvl) == 0) {
+        i <- i + 1
+        A <- lvl
+        result[[i]]<-c(A)
+        startFound <- TRUE
+        break
+      }
+    }
+    if(startFound == FALSE){
+      browser(expr = TRUE)
+      cat ("loop exist in constraints")
+      break
+    }
+    nextFound <- TRUE
+    while (nextFound){
+      nextFound <- FALSE
+      for (c in 1:nrofcons){
+        if(constraints[c, 2] == A){ 
+          B <-constraints[c,3]
+          result[[i]]<-append(B,result[[i]],after = length(result[[i]]))
+          A <- B
+          constraints[c,2]<-0
+          constraints[c,3]<-0
+          nrDone <- nrDone + 1
+          nextFound <- TRUE
+          break
+        }
+      }
+    }
+  }
+  #reorder so first element is longest
+  result<-result[order(sapply(result,function(x) -length(x) ))]
+  return(result)
+}
+
+# Nominal with constraints
+env_code$code_cat_wcon <-function(constraints, numlevs){
+  constraint_chain <- ordinal_chain(constraints) # create list of chains
+  missing <- NULL
+  con<-rep(0,numlevs) # storage for constraint
+  X<-matrix(0,numlevs,numlevs) # X will store the coded matrix
+  for (constrings in 1:length(constraint_chain)){
+    for (c in 1:(length(constraint_chain[[constrings]])-1)){
+      A<-constraint_chain[[constrings]][c]
+      B<-constraint_chain[[constrings]][c+1]
+      diagA<-X[A,A]  # diagonoal element A
+      sumB<-sum(X[B,]!=0) # Num of coded elements in row B
+      if (diagA==0 && sumB==0){
+        X[A,A]<-1
+        X[B,A]<-1
+        X[B,B]<-1
+        con[B]<-1
+      }
+      if (diagA!=0 && sumB==0){
+        X[B,]<-X[A,]
+        X[B,B]<-1
+        con[B]<-1
+      }
+      if (diagA==0 && sumB!=0){
+        X[A,]<-X[B,]
+        X[A,A]<--1
+        con[A]<-1
+      }
+      if (diagA!=0 && sumB!=0){        
+        missing<-rbind(missing,c(B,A))
+      }
+    }
+  }
+  for (lev in 1:numlevs){
+    if (X[lev,lev]==0) X[lev,lev]<-1
+  }
+  kolsum<-colSums(X)
+  reflev=match(max(kolsum),kolsum)
+  X<-X[,-reflev]
+  con<-con[-reflev]
+  return(list(code_matrix=X,con=con,missing=missing, reflev = reflev))
+}
+
 
 env_code$usercode1 <- function(kdata, vname, varout = NULL){
   if (is.null(varout)) varout <- vname
@@ -160,17 +297,54 @@ env_code$ordcode <- function(kdata, vname, cut_pts = NULL, thermcode = TRUE, var
   return(list(outcode = ordcode, code_matrix = code_matrix, vnames = varnames, prior = diag(ncol(code_matrix))))
 }
 
-env_code$setup_cores <- function(ncores){
-  if (file.exists(".GlobalEnv$k_multi_core")){
-    stopCluster(.GlobalEnv$k_multi_core)
-    remove(.GlobalEnv$k_multi_core)
+env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
+  # Check consistency of specified attributes and constraints with data
+  result <- TRUE
+  check_att <- att_coding[,1] %in% colnames(data_in)
+  if (min(check_att) == 0){
+    message("You specified attributes that are not in your data.  Please fix.")
+    att_coding[!check_att,1]
+    result <- FALSE
   }
-  if (ncores >= 1){
-    .GlobalEnv$k_multi_core <- makeCluster(min(ncores,detectCores()))
-    registerDoParallel(.GlobalEnv$k_multi_core)
-  } else {
-    message(" No parallel threads. Setting ncores < 1 removes parallel threads ")
+  if (!is.null(constraints)){
+    check_match <- constraints[,1] %in% att_coding[,1]
+    if (min(check_match) == 0){
+      message("You specified constraints that do no match any attribute in attribute file.  Please fix.")
+      constraints[!check_match,1]
+      result <- FALSE
+    }
   }
+  return(result)
+}
+
+env_code$indcode_spec_get <- function(data_in, att_coding,constraints){
+  if (check_atts_constraints(data_in, att_coding,constraints)){
+    catcode_types <- c("INDICATOR", "DUMMY","EFFECT","EFFECTS","NOMINAL")
+    indcode_spec <- list(nrow(att_coding))
+    for (i in 1:nrow(att_coding)){
+      att_name <- att_coding[i,1]
+      att_type <- toupper(att_coding[i,2]) # UPPERCASE
+      if (att_type %in% catcode_types){
+        codetype <- match(att_type, catcode_types)
+        codetype <- min(codetype,3) # anything listed after effect will default to effect
+        if (max(constraints[,1] %in% att_name) == 0) {
+          indcode_spec[[i]] <- catcode(data_in, att_name, codetype) # No constraints
+        } else{
+          indcode_spec[[i]] <- catcode(data_in, att_name, codetype, paircon = constraints[constraints[,1] == att_name,])
+        }    
+      }
+      if (att_type == "ORDINAL"){
+        indcode_spec[[i]] <- ordcode(data_in, att_name)
+        indcode_spec[[i]]$con_vec <- rep(att_coding[i,3], ncol(indcode_spec[[i]]$code_matrix))  
+      }
+      if (att_type == "USERSPECIFIED"){
+        indcode_spec[[i]] <- usercode1(data_in, att_name)
+        indcode_spec[[i]]$con_vec <- att_coding[i,3]
+      }
+    }  
+    indcode_spec <- setNames(indcode_spec,att_coding[,1,drop = TRUE])
+  } else indcode_spec <- "Error: Data file, attributes, constraints do not match" 
+  return(indcode_spec)
 }
 
 env_code$list_to_matrix <- function(klist){
