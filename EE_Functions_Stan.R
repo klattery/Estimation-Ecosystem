@@ -69,6 +69,17 @@ env_code$catcode <- function(kdata, kcol, codetype = 3, varout = NULL, reflev = 
   return(list(outcode = outcode, code_matrix = code_matrix, vnames = varnames, prior = prior))
 }
 
+env_code$usercode1 <- function(kdata, vname, varout = NULL){
+  if (is.null(varout)) varout <- vname
+  outcode <- kdata[, colnames(kdata) == vname, drop = FALSE]
+  colnames(outcode) <- varout
+  code_matrix <- diag(1)
+  colnames(code_matrix) <- varout
+  prior <- code_matrix
+  return(list(outcode = outcode, code_matrix = code_matrix, vnames = varout, prior = prior))
+}
+
+
 env_code$usercode <- function(kdata, kcol, varout = NULL){
   if (is.null(varout)){
     varout <- colnames(kdata)[kcol]
@@ -109,17 +120,18 @@ env_code$ordmatrix2 <- function(num_levels) {
   return(ord_matrix)
 }
 
-env_code$ordcode <- function(kdata, kcol, cut_pts, thermcode = TRUE, varout = NULL, setna = 0) {
+env_code$ordcode <- function(kdata, vname, cut_pts = NULL, thermcode = TRUE, varout = NULL, setna = 0) {
   # xvec must be vector
-  # cut_pts must be sequential vector from low to high
+  # cut_pts must be sequential vector from low to high.  if null then all values except c(0,NA)
   # NA and values outside cut_pts are set to "setna", default = 0
   # varout is prefix for varout_cut
   # uses function ordmatrix
-  if (is.null(varout)){
-    varout <- colnames(kdata)[kcol]
-    if (is.null(varout)) varout <- "O"
+  if (is.null(varout)) varout <- vname
+  xvec <- kdata[, colnames(kdata) == vname, drop = TRUE]
+  if (is.null(cut_pts)){
+    cut_pts <- sort(unique(xvec)) # Unique values
+    cut_pts <- cut_pts[!(cut_pts %in% c(0, NA))]  # But exclude values in vector of setna (default 0,NA)
   }
-  xvec <- kdata[,kcol, drop = TRUE] # Added drop because of tibbles
   bad <- xvec < min(cut_pts) | xvec > max(cut_pts) | is.na(xvec)
   xvec[bad] <- min(cut_pts) # temp set to min
   high <- sapply(cut_pts, function(x) xvec <= x)
@@ -143,6 +155,7 @@ env_code$ordcode <- function(kdata, kcol, cut_pts, thermcode = TRUE, varout = NU
   ordcode[bad] <- setna # reset initial NA (default 0)
   vnames <- unlist(lapply(2:length(cut_pts), function(i) paste0(varout, "_",cut_pts[i-1],"_", cut_pts[i])))
   colnames(ordcode) <- vnames
+  colnames(code_matrix) <- vnames
   varnames <- paste0(varout, "_", cut_pts)
   return(list(outcode = ordcode, code_matrix = code_matrix, vnames = varnames, prior = diag(ncol(code_matrix))))
 }
@@ -178,10 +191,10 @@ env_code$list_to_matrix <- function(klist){
 env_code$make_codefiles <- function(indcode_list){
   # Converts list of codes to matrices:  # code_master, indcode, indprior
   result <- list()
+  indcode_list <- indcode_list[sapply(indcode_list, length) > 0] # remove NULL elements
+  names(indcode_list) <- NULL
   result$indcode <- do.call(cbind, lapply(indcode_list, function(x) x$outcode)) # coded variables 
   result$con <- do.call(c, lapply(indcode_list, function(x) x$con))
-  # result$code_master <- back_code(indcode_list)
-  # result$indprior <- get_prior(indcode_list) # of levels effect
   result$code_master <- list_to_matrix(lapply(indcode_list, function(x) x$code_matrix))
   result$indprior <- list_to_matrix(lapply(indcode_list, function(x) x$prior))
   colnames(result$code_master) <- colnames(result$indcode) 
