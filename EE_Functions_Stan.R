@@ -96,6 +96,7 @@ env_code$catcode <- function(kdata, vname, codetype = 3, varout = NULL, reflev =
 
 env_code$remove_implicits<-function(constraints){
   result <- c()
+  constraints <- as.matrix(constraints)
   for (c in 1:nrow(constraints)){
     att = constraints[c,1]
     A = constraints[c,2]
@@ -168,7 +169,7 @@ env_code$ordinal_chain <-function(constraints){
 
 # Nominal with constraints
 env_code$code_cat_wcon <-function(constraints, numlevs){
-  constraint_chain <- ordinal_chain(constraints) # create list of chains
+  constraint_chain <- ordinal_chain(as.matrix(constraints)) # create list of chains
   missing <- NULL
   con<-rep(0,numlevs) # storage for constraint
   X<-matrix(0,numlevs,numlevs) # X will store the coded matrix
