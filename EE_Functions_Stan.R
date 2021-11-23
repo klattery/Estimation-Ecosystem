@@ -31,7 +31,7 @@ env_code$setup_cores <- function(ncores){
 env_code$catcode <- function(kdata, vname, codetype = 3, varout = NULL, reflev = NULL, setna = 0, priorcode = c(0, NA), paircon = NULL) {
   #codetype 1 = indicator, 2= dummy, 3 = effects
   #reflev of NULL defaults to most shown level
-  colvec <- kdata[, colnames(kdata) == vname, drop = TRUE] # drop = TRUE to deal with tibbles
+  colvec <- kdata[[vname]] 
   if (is.null(varout)) varout <- vname
   colvec[colvec == priorcode[1]] <- priorcode[2]
   na_vals <- is.na(colvec)
@@ -212,7 +212,7 @@ env_code$code_cat_wcon <-function(constraints, numlevs){
 
 env_code$usercode1 <- function(kdata, vname, varout = NULL){
   if (is.null(varout)) varout <- vname
-  outcode <- kdata[, colnames(kdata) == vname, drop = FALSE]
+  outcode <- kdata[[vname]]
   colnames(outcode) <- varout
   code_matrix <- diag(1)
   colnames(code_matrix) <- varout
@@ -268,7 +268,7 @@ env_code$ordcode <- function(kdata, vname, cut_pts = NULL, thermcode = TRUE, var
   # varout is prefix for varout_cut
   # uses function ordmatrix
   if (is.null(varout)) varout <- vname
-  xvec <- kdata[, colnames(kdata) == vname, drop = TRUE]
+  xvec <- kdata[[vname]]
   if (is.null(cut_pts)){
     cut_pts <- sort(unique(xvec)) # Unique values
     cut_pts <- cut_pts[!(cut_pts %in% c(0, NA))]  # But exclude values in vector of setna (default 0,NA)
@@ -304,7 +304,7 @@ env_code$ordcode <- function(kdata, vname, cut_pts = NULL, thermcode = TRUE, var
 env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
   # Check consistency of specified attributes and constraints with data
   result <- TRUE
-  check_att <- att_coding[,1] %in% colnames(data_in)
+  check_att <- att_coding[,1,drop = TRUE] %in% colnames(data_in)
   if (min(check_att) == 0){
     message("You specified attributes that are not in your data.  Please fix.")
     att_coding[!check_att,1]
@@ -326,8 +326,8 @@ env_code$indcode_spec_get <- function(data_in, att_coding,constraints){
     catcode_types <- c("INDICATOR", "DUMMY","EFFECT","EFFECTS","NOMINAL")
     indcode_spec <- list(nrow(att_coding))
     for (i in 1:nrow(att_coding)){
-      att_name <- att_coding[i,1]
-      att_type <- toupper(att_coding[i,2]) # UPPERCASE
+      att_name <- att_coding[i,1,drop = TRUE]
+      att_type <- toupper(att_coding[i,2,drop = TRUE]) # UPPERCASE
       if (att_type %in% catcode_types){
         codetype <- match(att_type, catcode_types)
         codetype <- min(codetype,3) # anything listed after effect will default to effect
