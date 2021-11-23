@@ -311,7 +311,7 @@ env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
     result <- FALSE
   }
   if (!is.null(constraints)){
-    check_match <- constraints[,1] %in% att_coding[,1]
+    check_match <- constraints[,1, drop = TRUE] %in% att_coding[,1, drop = TRUE]
     if (min(check_match) == 0){
       message("You specified constraints that do no match any attribute in attribute file.  Please fix.")
       constraints[!check_match,1]
