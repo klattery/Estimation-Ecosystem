@@ -212,7 +212,7 @@ env_code$code_cat_wcon <-function(constraints, numlevs){
 
 env_code$usercode1 <- function(kdata, vname, varout = NULL){
   if (is.null(varout)) varout <- vname
-  outcode <- kdata[[vname]]
+  outcode <- as.matrix(kdata[[vname]])
   colnames(outcode) <- varout
   code_matrix <- diag(1)
   colnames(code_matrix) <- varout
