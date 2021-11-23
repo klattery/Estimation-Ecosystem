@@ -335,7 +335,7 @@ env_code$indcode_spec_get <- function(data_in, att_coding,constraints){
         if (max(constraints[,1,drop = TRUE] %in% att_name) == 0) {
           indcode_spec[[i]] <- catcode(data_in, att_name, codetype) # No constraints
         } else{
-          indcode_spec[[i]] <- catcode(data_in, att_name, codetype, paircon = constraints[constraints[,1] == att_name,])
+          indcode_spec[[i]] <- catcode(data_in, att_name, codetype, paircon = constraints[constraints[,1,drop=TRUE] == att_name,])
         }    
       }
       if (att_type == "ORDINAL"){
