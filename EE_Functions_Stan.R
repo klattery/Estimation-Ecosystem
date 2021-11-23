@@ -96,6 +96,7 @@ env_code$catcode <- function(kdata, vname, codetype = 3, varout = NULL, reflev =
 
 env_code$remove_implicits<-function(constraints){
   result <- c()
+  constraints <- data.frame(constraints) # Tibble does not work
   for (c in 1:nrow(constraints)){
     att = constraints[c,1]
     A = constraints[c,2]
