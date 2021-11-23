@@ -331,7 +331,7 @@ env_code$indcode_spec_get <- function(data_in, att_coding,constraints){
       if (att_type %in% catcode_types){
         codetype <- match(att_type, catcode_types)
         codetype <- min(codetype,3) # anything listed after effect will default to effect
-        if (max(constraints[,1] %in% att_name) == 0) {
+        if (max(constraints[,1,drop = TRUE] %in% att_name) == 0) {
           indcode_spec[[i]] <- catcode(data_in, att_name, codetype) # No constraints
         } else{
           indcode_spec[[i]] <- catcode(data_in, att_name, codetype, paircon = constraints[constraints[,1] == att_name,])
