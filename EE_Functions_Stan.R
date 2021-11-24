@@ -169,7 +169,7 @@ env_code$ordinal_chain <-function(constraints){
 
 # Nominal with constraints
 env_code$code_cat_wcon <-function(constraints, numlevs){
-  constraint_chain <- ordinal_chain(as.matrix(constraints)) # create list of chains
+  constraint_chain <- ordinal_chain(data.frame(constraints)) # create list of chains
   missing <- NULL
   con<-rep(0,numlevs) # storage for constraint
   X<-matrix(0,numlevs,numlevs) # X will store the coded matrix
@@ -322,6 +322,7 @@ env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
   return(result)
 }
 
+i <- 4
 env_code$indcode_spec_get <- function(data_in, att_coding,constraints){
   if (check_atts_constraints(data_in, att_coding,constraints)){
     catcode_types <- c("INDICATOR", "DUMMY","EFFECT","EFFECTS","NOMINAL")
@@ -340,11 +341,11 @@ env_code$indcode_spec_get <- function(data_in, att_coding,constraints){
       }
       if (att_type == "ORDINAL"){
         indcode_spec[[i]] <- ordcode(data_in, att_name)
-        indcode_spec[[i]]$con_sign <- rep(att_coding[i,3], ncol(indcode_spec[[i]]$code_matrix))  
+        indcode_spec[[i]]$con_sign <- rep(att_coding[i,3,drop = TRUE], ncol(indcode_spec[[i]]$code_matrix))  
       }
       if (att_type == "USERSPECIFIED"){
         indcode_spec[[i]] <- usercode1(data_in, att_name)
-        indcode_spec[[i]]$con_sign <- att_coding[i,3]
+        indcode_spec[[i]]$con_sign <- att_coding[i,3,drop = TRUE]
       }
     }  
     indcode_spec <- setNames(indcode_spec,att_coding[,1,drop = TRUE])
