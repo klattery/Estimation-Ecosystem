@@ -354,7 +354,7 @@ env_code$indcode_spec_get <- function(data_in, att_coding,constraints){
 }
 
 env_code$list_to_matrix <- function(klist){
-  # converts list of matrices to single matrix with blocks and 0's filling
+  # Create one matrix with blocks of matrices from list and 0 fills
   row_sizes <- sapply(klist, nrow)
   col_sizes <- sapply(klist, ncol)
   row_end <- cumsum(row_sizes)
@@ -379,6 +379,24 @@ env_code$make_codefiles <- function(indcode_spec){
   result$indprior <- list_to_matrix(lapply(indcode_list, function(x) x$prior))
   colnames(result$code_master) <- colnames(result$indcode) 
   rownames(result$code_master) <- do.call(c, lapply(indcode_list, function(x) x$vnames))
+  # This is for the pair constraints
+  pair_m <- lapply(indcode_list, function(one_list) {
+    if (is.null(one_list$pairs_add)){
+      result <- t(as.matrix(rep(0, ncol(one_list$code_matrix))))
+    } else {
+      code <- one_list$code_matrix
+      pairs <- one_list$pairs_add
+      result <- do.call(rbind, lapply(1:nrow(pairs), function(krow){
+        return(code[pairs[krow,1],] - code[pairs[krow,2],])
+      } 
+      ))
+    }
+    return(result)
+  })
+  pair_m2 <- list_to_matrix(pair_m)
+  colnames(pair_m2) <- colnames(result$code_master)
+  pair_m2 <- pair_m2[(rowSums(pair_m2 != 0) > 0),,drop = FALSE] # keep as matrix
+  result$con_matrix <- pair_m2
   return(result)
 }
 
