@@ -316,7 +316,7 @@ env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
     att_coding[!check_att,1]
     result <- FALSE
   }
-  if (!is.null(constraints)){
+  if (!is.null(constraints) & nrow(constraints) > 0){
     check_match <- constraints[,1, drop = TRUE] %in% att_coding[,1, drop = TRUE]
     if (min(check_match) == 0){
       message("You specified constraints that do no match any attribute in attribute file.  Please fix.")
@@ -335,9 +335,8 @@ env_code$indcode_spec_files <- function(data_in, att_coding,constraints){
       att_name <- att_coding[i,1,drop = TRUE]
       att_type <- toupper(att_coding[i,2,drop = TRUE]) # UPPERCASE
       if (att_type %in% catcode_types){ # CATEGORICAL
-        codetype <- match(att_type, catcode_types)
-        codetype <- min(codetype,3) # anything listed after effect will default to effect
-        if (max(constraints[,1,drop = TRUE] %in% att_name) == 0) {
+        codetype <- min(3, match(att_type, catcode_types))
+        if (sum(constraints[,1,drop = TRUE] == att_name) == 0) {
           indcode_spec[[i]] <- catcode(data_in, att_name, codetype) # No constraints
         } else{
           indcode_spec[[i]] <- catcode(data_in, att_name, codetype, paircon = constraints[constraints[,1,drop=TRUE] == att_name,])
