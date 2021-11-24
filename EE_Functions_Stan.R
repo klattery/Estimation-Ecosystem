@@ -374,7 +374,7 @@ env_code$make_codefiles <- function(indcode_spec){
   indcode_list <- indcode_spec[sapply(indcode_spec, length) > 0] # remove NULL elements
   names(indcode_list) <- NULL # to avoid adding to vnames
   result$indcode <- do.call(cbind, lapply(indcode_list, function(x) x$outcode)) # coded variables 
-  result$con_sign <- do.call(c, lapply(indcode_list, function(x) x$con_sign))
+  result$con_sign <- do.call("c", lapply(indcode_list, function(x) x$con_sign))
   result$code_master <- list_to_matrix(lapply(indcode_list, function(x) x$code_matrix))
   result$indprior <- list_to_matrix(lapply(indcode_list, function(x) x$prior))
   colnames(result$code_master) <- colnames(result$indcode) 
