@@ -324,12 +324,12 @@ env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
 
 env_code$indcode_spec_files <- function(data_in, att_coding,constraints){
   if (check_atts_constraints(data_in, att_coding,constraints)){
-    catcode_types <- c("INDICATOR", "DUMMY","EFFECT","EFFECTS","NOMINAL")
+    catcode_types <- c("INDICATOR", "DUMMY","EFFECT","EFFECTS","CATEGORICAL","NOMINAL")
     indcode_spec <- list(nrow(att_coding))
     for (i in 1:nrow(att_coding)){
       att_name <- att_coding[i,1,drop = TRUE]
       att_type <- toupper(att_coding[i,2,drop = TRUE]) # UPPERCASE
-      if (att_type %in% catcode_types){
+      if (att_type %in% catcode_types){ # CATEGORICAL
         codetype <- match(att_type, catcode_types)
         codetype <- min(codetype,3) # anything listed after effect will default to effect
         if (max(constraints[,1,drop = TRUE] %in% att_name) == 0) {
