@@ -322,7 +322,6 @@ env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
   return(result)
 }
 
-i <- 4
 env_code$indcode_spec_get <- function(data_in, att_coding,constraints){
   if (check_atts_constraints(data_in, att_coding,constraints)){
     catcode_types <- c("INDICATOR", "DUMMY","EFFECT","EFFECTS","NOMINAL")
@@ -345,8 +344,9 @@ env_code$indcode_spec_get <- function(data_in, att_coding,constraints){
       }
       if (att_type == "USERSPECIFIED"){
         indcode_spec[[i]] <- usercode1(data_in, att_name)
-        indcode_spec[[i]]$con_sign <- att_coding[i,3,drop = TRUE]
-      }
+        con_sign <- att_coding[i,3,drop = TRUE]; con_sign[is.na(con_sign)] <- 0
+        indcode_spec[[i]]$con_sign <- con_sign
+       }
     }  
     indcode_spec <- setNames(indcode_spec,att_coding[,1,drop = TRUE])
   } else indcode_spec <- "Error: Data file, attributes, constraints do not match" 
@@ -368,11 +368,11 @@ env_code$list_to_matrix <- function(klist){
   return(result)  
 } 
 
-env_code$make_codefiles <- function(indcode_list){
+env_code$make_codefiles <- function(indcode_spec){
   # Converts list of codes to matrices:  # code_master, indcode, indprior
   result <- list()
-  indcode_list <- indcode_list[sapply(indcode_list, length) > 0] # remove NULL elements
-  names(indcode_list) <- NULL
+  indcode_list <- indcode_spec[sapply(indcode_spec, length) > 0] # remove NULL elements
+  names(indcode_list) <- NULL # to avoid adding to vnames
   result$indcode <- do.call(cbind, lapply(indcode_list, function(x) x$outcode)) # coded variables 
   result$con_sign <- do.call(c, lapply(indcode_list, function(x) x$con_sign))
   result$code_master <- list_to_matrix(lapply(indcode_list, function(x) x$code_matrix))
