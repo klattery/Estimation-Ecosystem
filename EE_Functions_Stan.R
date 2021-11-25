@@ -216,14 +216,16 @@ env_code$code_cat_wcon <-function(constraints, numlevs){
 }
 
 
-env_code$usercode1 <- function(kdata, vname, varout = NULL){
+env_code$usercode1 <- function(kdata, vname, varout = NULL, con_sign = 0){
+  # Single variable usercode
   if (is.null(varout)) varout <- vname
+  con_sign[is.na(con_sign)] <- 0
   outcode <- as.matrix(kdata[[vname]])
   colnames(outcode) <- varout
   code_matrix <- diag(1)
   colnames(code_matrix) <- varout
   prior <- code_matrix
-  return(list(outcode = outcode, code_matrix = code_matrix, vnames = varout, prior = prior))
+  return(list(outcode = outcode, code_matrix = code_matrix, con_sign = con_sign, vnames = varout, prior = prior))
 }
 
 
@@ -267,13 +269,14 @@ env_code$ordmatrix2 <- function(num_levels) {
   return(ord_matrix)
 }
 
-env_code$ordcode <- function(kdata, vname, cut_pts = NULL, thermcode = TRUE, varout = NULL, setna = 0) {
+env_code$ordcode <- function(kdata, vname, cut_pts = NULL, thermcode = TRUE, varout = NULL, setna = 0, con_sign = 0) {
   # xvec must be vector
   # cut_pts must be sequential vector from low to high.  if null then all values except c(0,NA)
   # NA and values outside cut_pts are set to "setna", default = 0
   # varout is prefix for varout_cut
   # uses function ordmatrix
   if (is.null(varout)) varout <- vname
+  con_sign[is.na(con_sign)] <- 0
   xvec <- kdata[[vname]]
   if (is.null(cut_pts)){
     cut_pts <- sort(unique(xvec)) # Unique values
@@ -304,7 +307,7 @@ env_code$ordcode <- function(kdata, vname, cut_pts = NULL, thermcode = TRUE, var
   colnames(ordcode) <- vnames
   colnames(code_matrix) <- vnames
   varnames <- paste0(varout, "_", cut_pts)
-  return(list(outcode = ordcode, code_matrix = code_matrix, vnames = varnames, prior = diag(ncol(code_matrix))))
+  return(list(outcode = ordcode, code_matrix = code_matrix, con_sign = rep(con_sign, ncol(code_matrix)), vnames = varnames, prior = diag(ncol(code_matrix))))
 }
 
 env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
@@ -327,7 +330,7 @@ env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
   return(result)
 }
 
-env_code$indcode_spec_files <- function(data_in, att_coding,constraints){
+env_code$indcode_spec_files <- function(data_in, att_coding, constraints){
   if (check_atts_constraints(data_in, att_coding,constraints)){
     catcode_types <- c("INDICATOR", "DUMMY","EFFECT","EFFECTS","CATEGORICAL","NOMINAL")
     indcode_spec <- list(nrow(att_coding))
@@ -343,13 +346,10 @@ env_code$indcode_spec_files <- function(data_in, att_coding,constraints){
         }    
       }
       if (att_type == "ORDINAL"){
-        indcode_spec[[i]] <- ordcode(data_in, att_name)
-        indcode_spec[[i]]$con_sign <- rep(att_coding[i,3,drop = TRUE], ncol(indcode_spec[[i]]$code_matrix))  
+        indcode_spec[[i]] <- ordcode(data_in, att_name, con_sign = att_coding[i,3,drop = TRUE])
       }
       if (att_type == "USERSPECIFIED"){
-        indcode_spec[[i]] <- usercode1(data_in, att_name)
-        con_sign <- att_coding[i,3,drop = TRUE]; con_sign[is.na(con_sign)] <- 0
-        indcode_spec[[i]]$con_sign <- con_sign
+        indcode_spec[[i]] <- usercode1(data_in, att_name, con_sign = att_coding[i,3,drop = TRUE])
        }
     }  
     indcode_spec <- setNames(indcode_spec,att_coding[,1,drop = TRUE])
