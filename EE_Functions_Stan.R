@@ -624,6 +624,30 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
   }  
 }
 
+env_stan$compile_and_est <- function(data_stan, data_model, dir_stanmodel,stan_file, outname, out_prefix, dir_work, threads){
+  HB_model <- cmdstan_model(file.path(dir_stanmodel,stan_file), quiet = TRUE, cpp_options = list(stan_threads = TRUE))
+
+  message(paste0("Optional lines to run in terminal to check progress:\n",
+                 "cd ", dir_work, "   # Change to your working directory and then:\n",
+                 "  awk 'END { print NR - 45 } ' '",outname,"-1.csv'", "                # Count lines in output\n",
+                 "  tail -n +45 '",outname,"-1.csv'  | cut -d, -f 1-300 > temp.csv", "  # Create temp.csv with first 300 columns\n"))
+  HB_model$sample(modifyList(data_stan, data_model),
+                  iter_warmup = data_model$iter_warmup,
+                  iter_sampling = data_model$iter_sampling,
+                  output_dir = dir_stanout,
+                  output_basename = outname,
+                  chains = threads[[1]],
+                  parallel_chains = threads[[2]],
+                  threads_per_chain = threads[[3]],
+                  save_warmup = TRUE,
+                  refresh = data_model$refresh,
+                  adapt_delta = data_stan$adapt_delta,
+                  show_messages = FALSE,
+                  validate_csv = FALSE
+  )
+}
+
+
 env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outname, out_prefix, dir_work){
   cat("Reading draws from Stan csv output into R (large files take time)...")
   csv_name <- do.call(c, lapply(1:nchains, function(i) paste0(outname,"-",i,".csv")))
