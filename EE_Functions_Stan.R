@@ -624,7 +624,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
   }  
 }
 
-env_stan$compile_and_est <- function(data_stan, data_model, dir_stanmodel,stan_file, outname, out_prefix, dir_work, threads){
+env_stan$stan_compile_and_est <- function(data_stan, data_model, dir_stanmodel,stan_file, outname, out_prefix, dir_work, threads){
   HB_model <- cmdstan_model(file.path(dir_stanmodel,stan_file), quiet = TRUE, cpp_options = list(stan_threads = TRUE))
 
   message(paste0("Optional lines to run in terminal to check progress:\n",
@@ -728,7 +728,7 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
   write.table(fit_stats, file = file.path(dir_work, paste0(out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
 }
 
-env_stan$betas_eb_con <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, nchains){
+env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, nchains){
   message("Using respondent draws and constraints for empirical bayes point estimates")
  
   con_matrix <- diag(data_stan$con_sign)
