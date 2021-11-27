@@ -754,9 +754,8 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   )
   
   setup_cores(r_cores)
-  eb_betas <- list(length(data_stan$resp_id))
-  preds <- list(length(data_stan$resp_id))
-  foreach(idseq = 1:length(data_stan$resp_id)) %dopar% {
+  result <- list()
+  result <- foreach(idseq = 1:length(data_stan$resp_id)) %dopar% {
     end <- idseq * data_stan$P
     start <- end - data_stan$P + 1
     resp_draws <- do.call(rbind, lapply(draws_beta$post_warmup_draws, function(x) x[,start:end]))
@@ -786,15 +785,16 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
                  sum(id_list$dep *id_list$wts))
     betas <- c(data_stan$resp_id[idseq], rlh, round(eb_solve$par, 6))
     names(betas) <- c("id", "rlh", colnames(data_stan$ind))
-    eb_betas[[idseq]] <- betas
-    preds[[idseq]] <- cbind(data_stan$idtask,data_stan$dep, data_stan$wts, predprob, predprob_mu)
+    preds <- cbind(data_stan$idtask[id_filter,],id_list$dep, id_list$wts, predprob, predprob_mu)
+    result[[idseq]] <- list(betas, preds)
   }
   if (file.exists(".GlobalEnv$k_multi_core")){
     stopCluster(.GlobalEnv$k_multi_core)
     remove(.GlobalEnv$k_multi_core)
   }
-  betas_eb <- do.call(rbind, eb_betas)
-  preds <- do.call(rbind, preds)
+  betas_eb <- do.call(rbind, lapply(result, function(x) x[[1]]))
+  preds <- do.call(rbind, lapply(result, function(x) x[[2]]))
+
   utilities_r_eb <- betas_eb[,-1:-2]  %*% t(data_stan$code_master)
   util_eb_name <- paste0(out_prefix,"_utilities_r_eb.csv")
   write.table(cbind(betas_eb[,1:2], utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
