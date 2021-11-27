@@ -732,7 +732,7 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
 }
 
 env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, nchains){
-  message("Using respondent draws and constraints for empirical bayes point estimates")
+  cat("Using respondent draws and constraints for empirical bayes point estimates")
  
   con_matrix <- diag(data_stan$con_sign)
   con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], indcode_list$con_matrix)
@@ -798,7 +798,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   utilities_r_eb <- betas_eb[,-1:-2]  %*% t(data_stan$code_master)
   util_eb_name <- paste0(out_prefix,"_utilities_r_eb.csv")
   write.table(cbind(betas_eb[,1:2], utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
-  message(paste0("EB point estimates in: ",util_eb_name))
+  message(paste0("/nEB point estimates in: ",util_eb_name))
   colnames(preds) <- c("id","task","dep","wts","pred_eb","pred_mu")
   preds_name <- paste0(out_prefix,"_preds.csv")
   write.table(preds, file = file.path(dir_work, preds_name), sep = ",", na = ".", row.names = FALSE)  
