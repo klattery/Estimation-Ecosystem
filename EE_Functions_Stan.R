@@ -784,7 +784,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
     predprob_mu <- model_id$func$pred(x = resp_mu, data_list = id_list)
     sum_wt <- sum(id_list$dep *id_list$wts)
     rlh <- exp(sum(log(predprob) * id_list$dep * id_list$wts)/sum_wt)
-    rlh_mu <- exp(sum(log(predprob) * id_list$dep * id_list$wts)/sum_wt)
+    rlh_mu <- exp(sum(log(predprob_mu) * id_list$dep * id_list$wts)/sum_wt)
     betas <- c(data_stan$resp_id[idseq], rlh, rlh_mu, round(eb_solve$par, 6))
     names(betas) <- c("id", "rlh_eb", "rlh_mu", colnames(data_stan$ind))
     preds <- cbind(data_stan$idtask[id_filter,],id_list$dep, id_list$wts, predprob, predprob_mu)
