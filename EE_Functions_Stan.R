@@ -728,6 +728,76 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
   write.table(fit_stats, file = file.path(dir_work, paste0(out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
 }
 
+env_stan$betas_eb_con <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, nchains){
+  message("Using respondent draws and constraints for empirical bayes point estimates")
+ 
+  con_matrix <- diag(data_stan$con_sign)
+  con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], indcode_list$con_matrix)
+  model_eb <- list(
+    func = list(
+      pred = env_modfun$PredMNL,
+      min = env_modfun$LL_wPriorPDF,
+      gr = env_modfun$grad_MNLwMVN,
+      logpdf = env_modfun$logpdf_mvnorm
+    ),
+    prior = list(
+      alpha = NULL,
+      cov_inv = NULL, # Cov Inverse 
+      upper_model = rep(TRUE, length(x0)),
+      scale = 1 # scale factor that we will solve for
+    ),
+    con = as.matrix(con_matrix), # must be matrix, 
+    x0 = x0 # starting point inside constraints - use overall mean
+  )
+  
+  setup_cores(r_cores)
+  eb_betas <- list(length(data_stan$resp_id))
+  eb_preds <- list(length(data_stan$resp_id))
+  eb_betas <- foreach(idseq = 1:length(data_stan$resp_id)) %dopar% {
+    end <- idseq * data_stan$P
+    start <- end - data_stan$P + 1
+    resp_draws <- do.call(rbind, lapply(draws_beta$post_warmup_draws, function(x) x[,start:end]))
+    model_id <- model_eb
+    resp_mu <- colMeans(resp_draws)
+    model_id$prior$alpha <- resp_mu
+    model_id$prior$cov_inv <- solve(cov(resp_draws))
+    
+    id_list <- list()
+    id_filter <- (data_stan$match_id == idseq)
+    task_id <- data_stan$idtask_r[id_filter]
+    task_id_u <- unique(task_id)
+    id_list$idtask_r <- (match(data.frame(t(task_id)), data.frame(t(task_id_u)))) # unique tasks
+    id_list$ind = data_stan$ind[id_filter,]
+    id_list$dep <- as.matrix(data_stan$dep[id_filter]) # Need matrix
+    id_list$wts <- data_stan$wts[id_filter]
+    
+    eb_solve <- constrOptim(theta = model_id$x0, f = model_id$func$min, grad = model_id$func$gr,
+                            ui = model_id$con, ci = rep(0,nrow(model_id$con)), mu = 1e-02, control = list(),
+                            method = "BFGS", outer.iterations = 100, outer.eps = 1e-05, 
+                            data_list = id_list,
+                            model_env = model_id)
+    
+    predprob <- model_id$func$pred(x = eb_solve$par, data_list = id_list)
+    predprob_mu <- model_id$func$pred(x = resp_mu, data_list = id_list)
+    rlh <- exp(sum(log(predprob) * id_list$dep * id_list$wts)/
+                 sum(id_list$dep *id_list$wts))
+    betas <- c(data_stan$resp_id[idseq], rlh, round(eb_solve$par, 6))
+    names(betas) <- c("id", "rlh", colnames(data_stan$ind))
+    eb_betas[[idseq]] <- betas
+    preds[[idseq]] <- cbind(data_stan$idtask,data_stan$dep, data_stan$wts, predprob, predprob_mu)
+  } 
+  betas_eb <- do.call(rbind, eb_betas)
+  preds <- do.call(rbind, preds)
+  utilities_r_eb <- betas_eb[,-1:-2]  %*% t(data_stan$code_master)
+  util_eb_name <- paste0(out_prefix,"_utilities_r_eb.csv")
+  write.table(cbind(betas_eb[,1:2], utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
+  message(paste0("EB point estimates in: ",util_eb_name))
+  colnames(preds_eb) <- c("id","task","dep","wts","pred_eb","pred_mu")
+  preds_name <- paste0(out_prefix,"_preds.csv")
+  write.table(preds, file = file.path(dir_work, preds_name), sep = ",", na = ".", row.names = FALSE)  
+  message(paste0("Predictions for your data in: ", preds_name))
+}         
+
 env_eb$numder_2 <- function(x, pos, delta = .01){
   # 2nd derivative
   xup <- x
