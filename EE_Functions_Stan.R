@@ -797,9 +797,9 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   betas_eb <- do.call(rbind, lapply(result, function(x) x[[1]]))
   preds <- do.call(rbind, lapply(result, function(x) x[[2]]))
 
-  utilities_r_eb <- betas_eb[,-1:-2]  %*% t(data_stan$code_master)
+  utilities_r_eb <- betas_eb[,-1:-3]  %*% t(data_stan$code_master) # id, rlh_eb, rlh_mu
   util_eb_name <- paste0(out_prefix,"_utilities_r_eb.csv")
-  write.table(cbind(betas_eb[,1:2], utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
+  write.table(cbind(betas_eb[,1:3], utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
   message(paste0("\nEB point estimates in: ",util_eb_name))
   colnames(preds) <- c("id","task","dep","wts","pred_eb","pred_mu")
   preds_name <- paste0(out_prefix,"_preds.csv")
