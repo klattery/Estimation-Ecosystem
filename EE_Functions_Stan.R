@@ -648,7 +648,7 @@ env_stan$stan_compile_and_est <- function(data_stan, data_model, dir_stanmodel,s
 }
 
 
-env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outname, out_prefix, dir_work){
+env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outname, out_prefix, dir_work, r_cores){
   cat("Reading draws from Stan csv output into R (large files take time)...")
   csv_name <- do.call(c, lapply(1:nchains, function(i) paste0(outname,"-",i,".csv")))
   draws_beta <- read_cmdstan_csv(file.path(dir_stanout, csv_name), variables = "beta_ind", format = "draws_list", sampler_diagnostics = "accept_stat__")
@@ -726,6 +726,9 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
   }
   dev.off()
   write.table(fit_stats, file = file.path(dir_work, paste0(out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
+
+  eb_betas_est(data_stan, draws_beta, colMeans(utilities), r_cores, out_prefix, dir_work, nchains)
+
 }
 
 env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, nchains){
