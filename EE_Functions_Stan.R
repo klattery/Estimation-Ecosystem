@@ -752,7 +752,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   
   setup_cores(r_cores)
   eb_betas <- list(length(data_stan$resp_id))
-  eb_preds <- list(length(data_stan$resp_id))
+  preds <- list(length(data_stan$resp_id))
   foreach(idseq = 1:length(data_stan$resp_id)) %dopar% {
     end <- idseq * data_stan$P
     start <- end - data_stan$P + 1
@@ -796,7 +796,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   util_eb_name <- paste0(out_prefix,"_utilities_r_eb.csv")
   write.table(cbind(betas_eb[,1:2], utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
   message(paste0("EB point estimates in: ",util_eb_name))
-  colnames(preds_eb) <- c("id","task","dep","wts","pred_eb","pred_mu")
+  colnames(preds) <- c("id","task","dep","wts","pred_eb","pred_mu")
   preds_name <- paste0(out_prefix,"_preds.csv")
   write.table(preds, file = file.path(dir_work, preds_name), sep = ",", na = ".", row.names = FALSE)  
   message(paste0("Predictions for your data in: ", preds_name))
