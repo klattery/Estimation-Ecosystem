@@ -753,7 +753,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   setup_cores(r_cores)
   eb_betas <- list(length(data_stan$resp_id))
   eb_preds <- list(length(data_stan$resp_id))
-  eb_betas <- foreach(idseq = 1:length(data_stan$resp_id)) %dopar% {
+  foreach(idseq = 1:length(data_stan$resp_id)) %dopar% {
     end <- idseq * data_stan$P
     start <- end - data_stan$P + 1
     resp_draws <- do.call(rbind, lapply(draws_beta$post_warmup_draws, function(x) x[,start:end]))
@@ -785,7 +785,11 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
     names(betas) <- c("id", "rlh", colnames(data_stan$ind))
     eb_betas[[idseq]] <- betas
     preds[[idseq]] <- cbind(data_stan$idtask,data_stan$dep, data_stan$wts, predprob, predprob_mu)
-  } 
+  }
+  if (file.exists(".GlobalEnv$k_multi_core")){
+    stopCluster(.GlobalEnv$k_multi_core)
+    remove(.GlobalEnv$k_multi_core)
+  }
   betas_eb <- do.call(rbind, eb_betas)
   preds <- do.call(rbind, preds)
   utilities_r_eb <- betas_eb[,-1:-2]  %*% t(data_stan$code_master)
