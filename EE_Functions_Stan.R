@@ -733,7 +733,7 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
 
 }
 
-env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work){
+env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, cov_scale){
   cat("\n")
   cat("Computing Empirical Bayes point estimates with respondent draws and constraints")
  
@@ -765,7 +765,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
     model_id <- model_eb
     resp_mu <- colMeans(resp_draws)
     model_id$prior$alpha <- resp_mu
-    model_id$prior$cov_inv <- solve(cov(resp_draws))
+    model_id$prior$cov_inv <- solve(cov(resp_draws) * cov_scale)
     
     id_list <- list()
     id_filter <- (data_stan$match_id == idseq)
