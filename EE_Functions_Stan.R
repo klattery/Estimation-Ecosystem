@@ -672,10 +672,12 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
   
   hist(do.call(rbind,draws_beta$post_warmup_sampler_diagnostics)$accept_stat__, breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
   saveRDS(modifyList(draws_beta,list(warmup_draws = NULL)), file.path(dir_work, draws_name)) # drop warmup
+  .GlobalEnv$draws_beta <- modifyList(draws_beta,list(warmup_draws = NULL))
   utilities <- matrix(
     Reduce("+",lapply(draws_beta$post_warmup_draws, colMeans))/nchains,
     data_stan$I, data_stan$P,
     byrow = TRUE) # First P entries are respondent 1, next P are resp 2
+  .GlobalEnv$utilities <- utilities
   utilities_r <- utilities %*% t(data_stan$code_master)
   write.table(cbind(id = data_stan$resp_id, utilities_r), file = file.path(dir_work, util_name), sep = ",", na = ".", row.names = FALSE)
   
@@ -727,11 +729,11 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
   dev.off()
   write.table(fit_stats, file = file.path(dir_work, paste0(out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
 
-  eb_betas_est(data_stan, draws_beta, colMeans(utilities), r_cores, out_prefix, dir_work, nchains)
+
 
 }
 
-env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, nchains){
+env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work){
   cat("\n")
   cat("Computing Empirical Bayes point estimates with respondent draws and constraints")
  
