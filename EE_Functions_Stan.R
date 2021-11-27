@@ -732,7 +732,8 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
 }
 
 env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, nchains){
-  cat("Using respondent draws and constraints for empirical bayes point estimates")
+  cat("\n")
+  cat("Computing Empirical Bayes point estimates with respondent draws and constraints")
  
   con_matrix <- diag(data_stan$con_sign)
   con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], indcode_list$con_matrix)
@@ -781,10 +782,11 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
     
     predprob <- model_id$func$pred(x = eb_solve$par, data_list = id_list)
     predprob_mu <- model_id$func$pred(x = resp_mu, data_list = id_list)
-    rlh <- exp(sum(log(predprob) * id_list$dep * id_list$wts)/
-                 sum(id_list$dep *id_list$wts))
-    betas <- c(data_stan$resp_id[idseq], rlh, round(eb_solve$par, 6))
-    names(betas) <- c("id", "rlh", colnames(data_stan$ind))
+    sum_wt <- sum(id_list$dep *id_list$wts)
+    rlh <- exp(sum(log(predprob) * id_list$dep * id_list$wts)/sum_wt)
+    rlh_mu <- exp(sum(log(predprob) * id_list$dep * id_list$wts)/sum_wt)
+    betas <- c(data_stan$resp_id[idseq], rlh, rlh_mu, round(eb_solve$par, 6))
+    names(betas) <- c("id", "rlh_eb", "rlh_mu", colnames(data_stan$ind))
     preds <- cbind(data_stan$idtask[id_filter,],id_list$dep, id_list$wts, predprob, predprob_mu)
     result[[idseq]] <- list(betas, preds)
   }
@@ -798,7 +800,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   utilities_r_eb <- betas_eb[,-1:-2]  %*% t(data_stan$code_master)
   util_eb_name <- paste0(out_prefix,"_utilities_r_eb.csv")
   write.table(cbind(betas_eb[,1:2], utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
-  message(paste0("/nEB point estimates in: ",util_eb_name))
+  message(paste0("\nEB point estimates in: ",util_eb_name))
   colnames(preds) <- c("id","task","dep","wts","pred_eb","pred_mu")
   preds_name <- paste0(out_prefix,"_preds.csv")
   write.table(preds, file = file.path(dir_work, preds_name), sep = ",", na = ".", row.names = FALSE)  
