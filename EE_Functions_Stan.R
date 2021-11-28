@@ -59,6 +59,8 @@ env_code$catcode <- function(kdata, vname, codetype = 3, varout = NULL, reflev =
       if (codetype %in% c(2, 3))code_matrix <- as.matrix(code_matrix[, -reflev, drop = FALSE]) # ref lev col dropped
       if (codetype == 3) code_matrix[reflev,] <- -1
     } else { # we have constraints
+      paircon <- apply(paircon[,-1], 2, function(x) match(x, labels_in)) # recode to seq levels
+      paircon <- paircon[(rowSums(is.na(paircon)) == 0),,drop = FALSE]  # drop rows with NA
       cat_con <- code_cat_wcon(paircon,numlevs)
       code_matrix <- cat_con$code_matrix
       con_vec <- cat_con$con
@@ -157,7 +159,7 @@ env_code$ordinal_chain <-function(constraints){
       nextFound <- FALSE
       for (c in 1:nrofcons){
         if(constraints[c, 2] == A){ 
-          B <-constraints[c,3]
+          B <- constraints[c,3]
           result[[i]]<-append(B,result[[i]],after = length(result[[i]]))
           A <- B
           constraints[c,2]<-0
@@ -170,7 +172,7 @@ env_code$ordinal_chain <-function(constraints){
     }
   }
   #reorder so first element is longest
-  result<-result[order(sapply(result,function(x) -length(x) ))]
+  result <- result[order(sapply(result,function(x) -length(x)))]
   return(result)
 }
 
@@ -178,37 +180,37 @@ env_code$ordinal_chain <-function(constraints){
 env_code$code_cat_wcon <-function(constraints, numlevs){
   constraint_chain <- ordinal_chain(data.frame(constraints)) # create list of chains
   missing <- NULL
-  con<-rep(0,numlevs) # storage for constraint
-  X<-matrix(0,numlevs,numlevs) # X will store the coded matrix
+  con <- rep(0,numlevs) # storage for constraint
+  X <- matrix(0,numlevs,numlevs) # X will store the coded matrix
   for (constrings in 1:length(constraint_chain)){
     for (c in 1:(length(constraint_chain[[constrings]])-1)){
-      A<-constraint_chain[[constrings]][c]
-      B<-constraint_chain[[constrings]][c+1]
-      diagA<-X[A,A]  # diagonal element A
-      sumB<-sum(X[B,]!=0) # Num of coded elements in row B
+      A <- constraint_chain[[constrings]][c]
+      B <- constraint_chain[[constrings]][c+1]
+      diagA <- X[A,A]  # diagonal element A
+      sumB <- sum(X[B,]!=0) # Num of coded elements in row B
       if (diagA==0 && sumB==0){
-        X[A,A]<-1
-        X[B,A]<-1
-        X[B,B]<-1
-        con[B]<-1
+        X[A,A] <- 1
+        X[B,A] <- 1
+        X[B,B] <- 1
+        con[B] <- 1
       }
       if (diagA!=0 && sumB==0){
-        X[B,]<-X[A,]
-        X[B,B]<-1
-        con[B]<-1
+        X[B,] <- X[A,]
+        X[B,B] <- 1
+        con[B] <- 1
       }
       if (diagA==0 && sumB!=0){
-        X[A,]<-X[B,]
-        X[A,A]<--1
-        con[A]<-1
+        X[A,] <- X[B,]
+        X[A,A] <- -1
+        con[A] <- 1
       }
       if (diagA!=0 && sumB!=0){        
-        missing<-rbind(missing,c(B,A))
+        missing <- rbind(missing,c(B,A))
       }
     }
   }
   for (lev in 1:numlevs){
-    if (X[lev,lev]==0) X[lev,lev]<-1
+    if (X[lev,lev]==0) X[lev,lev] <- 1
   }
   kolsum <- colSums(X)
   kolsum[(con != 0)] <- -99 # columns with constraints (!=0) are keepers
