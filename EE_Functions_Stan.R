@@ -410,11 +410,13 @@ env_code$make_codefiles <- function(indcode_spec){
   
   # export code matrix, sign, and constraints in 1 file
   df1 <- rbind(result$code_master, result$con_sign, result$con_matrix)
-  code_names <- c(rownames(result$code_master), "con_sign")
-  if (nrow(df1) > length(code_names)) more_names <- rep("", nrow(df1) - length(code_names))
-  more_names[1] <- "con_pair(s)"
-  labels <- c(code_names, more_names)
-  write.table(cbind(labels, df1), file = file.path(dir_work, paste0(out_prefix,"_code_master.csv")), sep = ",", na = ".", row.names = FALSE)
+  att_labels <- c(rownames(result$code_master), "con_sign")
+  if (nrow(df1) > length(att_labels)){
+    more_names <- rep("", nrow(df1) - length(att_labels))
+    more_names[1] <- "con_pair(s)"
+    att_labels <- c(code_names, more_names)
+  } 
+  write.table(cbind(att_labels, df1), file = file.path(dir_work, paste0(out_prefix,"_code_master.csv")), sep = ",", na = ".", row.names = FALSE)
   
   return(result)
 }
