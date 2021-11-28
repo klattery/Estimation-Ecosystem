@@ -579,9 +579,8 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
   # Add Stan stuff
   end <- c(which(diff(idtask_r)!=0), length(idtask_r))
   start <- c(1, end[-length(end)]+1)
-  # Return list of data (depends on whether other data was also chosen)
-  if (!is.null(other_data)){
-    return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
+  if (!is.null(other_data)) {other_data <- as.matrix(other_data)[sort_order,]}
+  return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
                 dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
                 task_individual = match_id[start],
                 start = start,
@@ -600,29 +599,9 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
                 i_cov = matrix(0, length(resp_id), 0),
                 adapt_delta = .8,
                 wts = wts,
-                other_data = as.matrix(other_data)[sort_order,])) # Only Added item in list vs below
-  } else {
-    return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
-                dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
-                task_individual = match_id[start],
-                start = start,
-                end = end,
-                con_sign = indcode_list$con_sign,
-                prior_cov = indcode_list$indprior,
-                code_master = indcode_list$code_master,
-                paircon_rows = nrow(indcode_list$con_matrix),
-                paircon_matrix = indcode_list$con_matrix,
-                df = 2,
-                prior_alpha = rep(0, ncol(ind)),
-                a_sig = 10,
-                cov_block = matrix(1, ncol(ind), ncol(ind)),
-                prior_cov_scale = 1,
-                P_cov = 0,
-                i_cov = matrix(0, length(resp_id), 0),
-                adapt_delta = .8,
-                wts = wts))
-  }  
-}
+                other_data = other_data)) # Only Added item in list vs below
+}  
+
 
 env_stan$stan_compile_and_est <- function(data_stan, data_model, dir_stanmodel,stan_file, outname, out_prefix, dir_work, threads){
   HB_model <- cmdstan_model(file.path(dir_stanmodel,stan_file), quiet = TRUE, cpp_options = list(stan_threads = TRUE))
