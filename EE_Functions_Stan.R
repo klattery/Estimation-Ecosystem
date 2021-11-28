@@ -215,9 +215,9 @@ env_code$code_cat_wcon <-function(constraints, numlevs){
   }
   kolsum <- colSums(X)
   kolsum[(con != 0)] <- -99 # columns with constraints (!=0) are keepers
-  reflev=match(max(kolsum),kolsum)
-  X<-X[,-reflev]
-  con<-con[-reflev]
+  reflev <- match(max(kolsum),kolsum)
+  X <- X[,-reflev, drop = FALSE]
+  con <- con[-reflev]
   return(list(code_matrix=X,con=con,pairs_add=missing, reflev = reflev))
 }
 
