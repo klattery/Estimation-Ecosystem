@@ -59,7 +59,8 @@ env_code$catcode <- function(kdata, vname, codetype = 3, varout = NULL, reflev =
       if (codetype %in% c(2, 3))code_matrix <- as.matrix(code_matrix[, -reflev, drop = FALSE]) # ref lev col dropped
       if (codetype == 3) code_matrix[reflev,] <- -1
     } else { # we have constraints
-      paircon <- apply(paircon[,-1], 2, function(x) match(x, labels_in)) # recode to seq levels
+      paircon[,2] <- match(paircon[,2], labels_in) # recode to seq levels
+      paircon[,3] <- match(paircon[,3], labels_in) # recode to seq levels
       paircon <- paircon[(rowSums(is.na(paircon)) == 0),,drop = FALSE]  # drop rows with NA
       cat_con <- code_cat_wcon(paircon,numlevs)
       code_matrix <- cat_con$code_matrix
