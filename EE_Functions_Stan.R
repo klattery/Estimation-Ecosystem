@@ -388,7 +388,7 @@ env_code$make_codefiles <- function(indcode_spec){
   result$code_master <- list_to_matrix(lapply(indcode_list, function(x) x$code_matrix))
   result$indprior <- list_to_matrix(lapply(indcode_list, function(x) x$prior))
   colnames(result$code_master) <- colnames(result$indcode) 
-  rownames(result$code_master) <- do.call(c, lapply(indcode_list, function(x) x$vnames))
+  rownames(result$code_master) <- do.call("c", lapply(indcode_list, function(x) x$vnames))
   # This is for the pair constraints
   pair_m <- lapply(indcode_list, function(one_list) {
     if (is.null(one_list$pairs_add)){
