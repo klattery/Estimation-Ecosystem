@@ -184,7 +184,7 @@ env_code$code_cat_wcon <-function(constraints, numlevs){
     for (c in 1:(length(constraint_chain[[constrings]])-1)){
       A<-constraint_chain[[constrings]][c]
       B<-constraint_chain[[constrings]][c+1]
-      diagA<-X[A,A]  # diagonoal element A
+      diagA<-X[A,A]  # diagonal element A
       sumB<-sum(X[B,]!=0) # Num of coded elements in row B
       if (diagA==0 && sumB==0){
         X[A,A]<-1
@@ -210,7 +210,8 @@ env_code$code_cat_wcon <-function(constraints, numlevs){
   for (lev in 1:numlevs){
     if (X[lev,lev]==0) X[lev,lev]<-1
   }
-  kolsum<-colSums(X)
+  kolsum <- colSums(X)
+  kolsum[(con != 0)] <- -99 # columns with constraints (!=0) are keepers
   reflev=match(max(kolsum),kolsum)
   X<-X[,-reflev]
   con<-con[-reflev]
