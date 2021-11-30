@@ -414,7 +414,7 @@ env_code$make_codefiles <- function(indcode_spec){
   if (nrow(df1) > length(att_labels)){
     more_names <- rep("", nrow(df1) - length(att_labels))
     more_names[1] <- "con_pair(s)"
-    att_labels <- c(code_names, more_names)
+    att_labels <- c(att_labels, more_names)
   } 
   write.table(cbind(att_labels, df1), file = file.path(dir_work, paste0(out_prefix,"_code_master.csv")), sep = ",", na = ".", row.names = FALSE)
   
