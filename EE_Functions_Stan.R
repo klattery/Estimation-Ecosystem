@@ -624,7 +624,7 @@ env_stan$stan_compile_and_est <- function(data_stan, data_model, dir_stanmodel,s
   HB_model <- cmdstan_model(file.path(dir_stanmodel,stan_file), quiet = TRUE, cpp_options = list(stan_threads = TRUE))
 
   message(paste0("Optional lines to run in terminal to check progress:\n",
-                 "cd ", dir_work, "   # Change to your working directory and then:\n",
+                 "cd ", dir_stanout, "   # Change to your working directory and then:\n",
                  "  awk 'END { print NR - 45 } ' '",outname,"-1.csv'", "                # Count lines in output\n",
                  "  tail -n +45 '",outname,"-1.csv'  | cut -d, -f 1-300 > temp.csv", "  # Create temp.csv with first 300 columns\n"))
   HB_model$sample(modifyList(data_stan, data_model),
