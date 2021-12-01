@@ -59,6 +59,9 @@ env_code$catcode <- function(kdata, vname, codetype = 3, varout = NULL, reflev =
       if (codetype %in% c(2, 3))code_matrix <- as.matrix(code_matrix[, -reflev, drop = FALSE]) # ref lev col dropped
       if (codetype == 3) code_matrix[reflev,] <- -1
     } else { # we have constraints
+      paircon[,2] <- match(paircon[,2], labels_in) # recode to seq levels
+      paircon[,3] <- match(paircon[,3], labels_in) # recode to seq levels
+      paircon <- paircon[(rowSums(is.na(paircon)) == 0),,drop = FALSE]  # drop rows with NA
       cat_con <- code_cat_wcon(paircon,numlevs)
       code_matrix <- cat_con$code_matrix
       con_vec <- cat_con$con
@@ -157,7 +160,7 @@ env_code$ordinal_chain <-function(constraints){
       nextFound <- FALSE
       for (c in 1:nrofcons){
         if(constraints[c, 2] == A){ 
-          B <-constraints[c,3]
+          B <- constraints[c,3]
           result[[i]]<-append(B,result[[i]],after = length(result[[i]]))
           A <- B
           constraints[c,2]<-0
@@ -170,7 +173,7 @@ env_code$ordinal_chain <-function(constraints){
     }
   }
   #reorder so first element is longest
-  result<-result[order(sapply(result,function(x) -length(x) ))]
+  result <- result[order(sapply(result,function(x) -length(x)))]
   return(result)
 }
 
@@ -178,42 +181,43 @@ env_code$ordinal_chain <-function(constraints){
 env_code$code_cat_wcon <-function(constraints, numlevs){
   constraint_chain <- ordinal_chain(data.frame(constraints)) # create list of chains
   missing <- NULL
-  con<-rep(0,numlevs) # storage for constraint
-  X<-matrix(0,numlevs,numlevs) # X will store the coded matrix
+  con <- rep(0,numlevs) # storage for constraint
+  X <- matrix(0,numlevs,numlevs) # X will store the coded matrix
   for (constrings in 1:length(constraint_chain)){
     for (c in 1:(length(constraint_chain[[constrings]])-1)){
-      A<-constraint_chain[[constrings]][c]
-      B<-constraint_chain[[constrings]][c+1]
-      diagA<-X[A,A]  # diagonoal element A
-      sumB<-sum(X[B,]!=0) # Num of coded elements in row B
+      A <- constraint_chain[[constrings]][c]
+      B <- constraint_chain[[constrings]][c+1]
+      diagA <- X[A,A]  # diagonal element A
+      sumB <- sum(X[B,]!=0) # Num of coded elements in row B
       if (diagA==0 && sumB==0){
-        X[A,A]<-1
-        X[B,A]<-1
-        X[B,B]<-1
-        con[B]<-1
+        X[A,A] <- 1
+        X[B,A] <- 1
+        X[B,B] <- 1
+        con[B] <- 1
       }
       if (diagA!=0 && sumB==0){
-        X[B,]<-X[A,]
-        X[B,B]<-1
-        con[B]<-1
+        X[B,] <- X[A,]
+        X[B,B] <- 1
+        con[B] <- 1
       }
       if (diagA==0 && sumB!=0){
-        X[A,]<-X[B,]
-        X[A,A]<--1
-        con[A]<-1
+        X[A,] <- X[B,]
+        X[A,A] <- -1
+        con[A] <- 1
       }
       if (diagA!=0 && sumB!=0){        
-        missing<-rbind(missing,c(B,A))
+        missing <- rbind(missing,c(B,A))
       }
     }
   }
   for (lev in 1:numlevs){
-    if (X[lev,lev]==0) X[lev,lev]<-1
+    if (X[lev,lev]==0) X[lev,lev] <- 1
   }
-  kolsum<-colSums(X)
-  reflev=match(max(kolsum),kolsum)
-  X<-X[,-reflev]
-  con<-con[-reflev]
+  kolsum <- colSums(X)
+  kolsum[(con != 0)] <- -99 # columns with constraints (!=0) are keepers
+  reflev <- match(max(kolsum),kolsum)
+  X <- X[,-reflev, drop = FALSE]
+  con <- con[-reflev]
   return(list(code_matrix=X,con=con,pairs_add=missing, reflev = reflev))
 }
 
@@ -384,7 +388,7 @@ env_code$make_codefiles <- function(indcode_spec){
   result$code_master <- list_to_matrix(lapply(indcode_list, function(x) x$code_matrix))
   result$indprior <- list_to_matrix(lapply(indcode_list, function(x) x$prior))
   colnames(result$code_master) <- colnames(result$indcode) 
-  rownames(result$code_master) <- do.call(c, lapply(indcode_list, function(x) x$vnames))
+  rownames(result$code_master) <- do.call("c", lapply(indcode_list, function(x) x$vnames))
   # This is for the pair constraints
   pair_m <- lapply(indcode_list, function(one_list) {
     if (is.null(one_list$pairs_add)){
@@ -403,6 +407,17 @@ env_code$make_codefiles <- function(indcode_spec){
   colnames(pair_m2) <- colnames(result$code_master)
   pair_m2 <- pair_m2[(rowSums(pair_m2 != 0) > 0),,drop = FALSE] # keep as matrix
   result$con_matrix <- pair_m2
+  
+  # export code matrix, sign, and constraints in 1 file
+  df1 <- rbind(result$code_master, result$con_sign, result$con_matrix)
+  att_labels <- c(rownames(result$code_master), "con_sign")
+  if (nrow(df1) > length(att_labels)){
+    more_names <- rep("", nrow(df1) - length(att_labels))
+    more_names[1] <- "con_pair(s)"
+    att_labels <- c(att_labels, more_names)
+  } 
+  write.table(cbind(att_labels, df1), file = file.path(dir_work, paste0(out_prefix,"_code_master.csv")), sep = ",", na = ".", row.names = FALSE)
+  
   return(result)
 }
 
@@ -579,30 +594,10 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
   # Add Stan stuff
   end <- c(which(diff(idtask_r)!=0), length(idtask_r))
   start <- c(1, end[-length(end)]+1)
-  # Return list of data (depends on whether other data was also chosen)
-  if (!is.null(other_data)){
-    return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
-                dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
-                task_individual = match_id[start],
-                start = start,
-                end = end,
-                con_sign = indcode_list$con_sign,
-                prior_cov = indcode_list$indprior,
-                code_master = indcode_list$code_master,
-                paircon_row = nrow(indcode_list$con_matrix),
-                paircon_matrix = indcode_list$con_matrix,
-                df = 2,
-                prior_alpha = rep(0, ncol(ind)),
-                a_sig = 10,
-                cov_block = matrix(1, ncol(ind), ncol(ind)),
-                prior_cov_scale = 1,
-                P_cov = 0,
-                i_cov = matrix(0, length(resp_id), 0),
-                adapt_delta = .8,
-                wts = wts,
-                other_data = as.matrix(other_data)[sort_order,])) # Only Added item in list vs below
-  } else {
-    return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
+  if (!is.null(other_data)) {
+    other_data <- as.matrix(other_data)[sort_order,]
+    } else other_data <- 0
+  return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
                 dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
                 task_individual = match_id[start],
                 start = start,
@@ -620,15 +615,16 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
                 P_cov = 0,
                 i_cov = matrix(0, length(resp_id), 0),
                 adapt_delta = .8,
-                wts = wts))
-  }  
-}
+                wts = wts,
+                other_data = other_data)) # Only Added item in list vs below
+}  
+
 
 env_stan$stan_compile_and_est <- function(data_stan, data_model, dir_stanmodel,stan_file, outname, out_prefix, dir_work, threads){
   HB_model <- cmdstan_model(file.path(dir_stanmodel,stan_file), quiet = TRUE, cpp_options = list(stan_threads = TRUE))
 
   message(paste0("Optional lines to run in terminal to check progress:\n",
-                 "cd ", dir_work, "   # Change to your working directory and then:\n",
+                 "cd ", dir_stanout, "   # Change to your working directory and then:\n",
                  "  awk 'END { print NR - 45 } ' '",outname,"-1.csv'", "                # Count lines in output\n",
                  "  tail -n +45 '",outname,"-1.csv'  | cut -d, -f 1-300 > temp.csv", "  # Create temp.csv with first 300 columns\n"))
   HB_model$sample(modifyList(data_stan, data_model),
@@ -672,10 +668,12 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
   
   hist(do.call(rbind,draws_beta$post_warmup_sampler_diagnostics)$accept_stat__, breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
   saveRDS(modifyList(draws_beta,list(warmup_draws = NULL)), file.path(dir_work, draws_name)) # drop warmup
+  .GlobalEnv$draws_beta <- modifyList(draws_beta,list(warmup_draws = NULL))
   utilities <- matrix(
     Reduce("+",lapply(draws_beta$post_warmup_draws, colMeans))/nchains,
     data_stan$I, data_stan$P,
     byrow = TRUE) # First P entries are respondent 1, next P are resp 2
+  .GlobalEnv$utilities <- utilities
   utilities_r <- utilities %*% t(data_stan$code_master)
   write.table(cbind(id = data_stan$resp_id, utilities_r), file = file.path(dir_work, util_name), sep = ",", na = ".", row.names = FALSE)
   
@@ -727,12 +725,13 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
   dev.off()
   write.table(fit_stats, file = file.path(dir_work, paste0(out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
 
-  eb_betas_est(data_stan, draws_beta, colMeans(utilities), r_cores, out_prefix, dir_work, nchains)
+
 
 }
-x0 <- colMeans(utilities)
-env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, nchains){
-  cat("Using respondent draws and constraints for empirical bayes point estimates")
+
+env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, cov_scale){
+  cat("\n")
+  cat("Computing Empirical Bayes point estimates with respondent draws and constraints")
  
   con_matrix <- diag(data_stan$con_sign)
   con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], indcode_list$con_matrix)
@@ -754,7 +753,6 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   )
   
   setup_cores(r_cores)
-  result <- list(eb_betas = list(), preds = list())
   result <- list()
   result <- foreach(idseq = 1:length(data_stan$resp_id)) %dopar% {
     end <- idseq * data_stan$P
@@ -763,7 +761,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
     model_id <- model_eb
     resp_mu <- colMeans(resp_draws)
     model_id$prior$alpha <- resp_mu
-    model_id$prior$cov_inv <- solve(cov(resp_draws))
+    model_id$prior$cov_inv <- solve(cov(resp_draws) * cov_scale)
     
     id_list <- list()
     id_filter <- (data_stan$match_id == idseq)
@@ -782,24 +780,25 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
     
     predprob <- model_id$func$pred(x = eb_solve$par, data_list = id_list)
     predprob_mu <- model_id$func$pred(x = resp_mu, data_list = id_list)
-    rlh <- exp(sum(log(predprob) * id_list$dep * id_list$wts)/
-                 sum(id_list$dep *id_list$wts))
-    betas <- c(data_stan$resp_id[idseq], rlh, round(eb_solve$par, 6))
-    names(betas) <- c("id", "rlh", colnames(data_stan$ind))
-    result$eb_betas[[idseq]] <- betas
-    result$preds[[idseq]] <- cbind(data_stan$idtask,data_stan$dep, data_stan$wts, predprob, predprob_mu)
-    result
- }
+    sum_wt <- sum(id_list$dep *id_list$wts)
+    rlh <- exp(sum(log(predprob) * id_list$dep * id_list$wts)/sum_wt)
+    rlh_mu <- exp(sum(log(predprob_mu) * id_list$dep * id_list$wts)/sum_wt)
+    betas <- c(data_stan$resp_id[idseq], rlh, rlh_mu, round(eb_solve$par, 6))
+    names(betas) <- c("id", "rlh_eb", "rlh_mu", colnames(data_stan$ind))
+    preds <- cbind(data_stan$idtask[id_filter,],id_list$dep, id_list$wts, predprob, predprob_mu)
+    result[[idseq]] <- list(betas, preds)
+  }
   if (file.exists(".GlobalEnv$k_multi_core")){
     stopCluster(.GlobalEnv$k_multi_core)
     remove(.GlobalEnv$k_multi_core)
   }
-  betas_eb <- do.call(rbind, lapply(result, function(x) x$eb_betas))
-  preds <- do.call(rbind, preds)
-  utilities_r_eb <- betas_eb[,-1:-2]  %*% t(data_stan$code_master)
+  betas_eb <- do.call(rbind, lapply(result, function(x) x[[1]]))
+  preds <- do.call(rbind, lapply(result, function(x) x[[2]]))
+
+  utilities_r_eb <- betas_eb[,-1:-3]  %*% t(data_stan$code_master) # id, rlh_eb, rlh_mu
   util_eb_name <- paste0(out_prefix,"_utilities_r_eb.csv")
-  write.table(cbind(betas_eb[,1:2], utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
-  message(paste0("EB point estimates in: ",util_eb_name))
+  write.table(cbind(betas_eb[,1:3], utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
+  message(paste0("\nEB point estimates in: ",util_eb_name))
   colnames(preds) <- c("id","task","dep","wts","pred_eb","pred_mu")
   preds_name <- paste0(out_prefix,"_preds.csv")
   write.table(preds, file = file.path(dir_work, preds_name), sep = ",", na = ".", row.names = FALSE)  
