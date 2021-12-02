@@ -384,7 +384,34 @@ env_code$make_codefiles <- function(indcode_spec){
   result <- list()
   indcode_list <- indcode_spec[sapply(indcode_spec, length) > 0] # remove NULL elements
   names(indcode_list) <- NULL # to avoid adding to vnames
+
+  # Create two files: coded and uncoded levels, and a combined version for R
+  ind_coded <- NULL # coded data
+  ind_levels <- NULL # uncoded (will be coded in Stan)
+  col_beg <- 1 # code_matrix col
+  row_beg <- 1 # code_matrix row
+  coded_beg <- 1 # column of coded data
+  code_blocks <- matrix(0, nrow = length(indcode_list), ncol = 5)
+  # col_beg, col_end, row_beg, row_end, coded_beg
+  for (i in 1:length(indcode_list)){
+    x <- indcode_list[[i]]
+    col_end <- col_beg + ncol(x$code_matrix) - 1
+    row_end <- row_beg + nrow(x$code_matrix) - 1
+    if (is.null(x$levels)){
+      ind_coded <- cbind(ind_coded, x$outcode)
+      code_blocks[i,] <- c(col_beg, col_end, row_beg, row_end, coded_beg)
+      coded_beg <- coded_beg + ncol(x$code_matrix) # could also use x$outcode
+    } else {
+      ind_levels <- cbind(ind_levels, x$levels)
+      code_blocks[i,] <- c(col_beg, col_end, row_beg, row_end, 0) # 0 = not in coded file
+    }
+    col_beg <- col_end + 1 # next column of code_matrix
+    row_beg <- row_end + 1 # next row of code_matrix
+  }
   result$indcode <- do.call(cbind, lapply(indcode_list, function(x) x$outcode)) # coded variables 
+  result$ind_coded <- ind_coded
+  result$ind_levels <- ind_levels
+  result$code_blocks <- code_blocks
   result$con_sign <- do.call("c", lapply(indcode_list, function(x) x$con_sign))
   result$code_master <- list_to_matrix(lapply(indcode_list, function(x) x$code_matrix))
   result$indprior <- list_to_matrix(lapply(indcode_list, function(x) x$prior))
