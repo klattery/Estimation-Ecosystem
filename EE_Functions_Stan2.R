@@ -603,6 +603,8 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
   sort_order <- order(idtaskdep[, 1], idtaskdep[, 2])
   sort_order[!train] <- 0 # Non-training gets order = 0, which removes
   ind <- as.matrix(indcode_list$indcode[sort_order,])
+  ind_coded <- as.matrix(indcode_list$ind_coded[sort_order,])
+  ind_levels <- as.matrix(indcode_list$ind_levels[sort_order,])
   
   dep <- as.vector(as.matrix(idtaskdep[sort_order, 3]))
   idtask <- data.frame(idtaskdep[sort_order, 1:2])
@@ -627,6 +629,12 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
     } else other_data <- 0
   return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
                 dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
+                ind_coded = ind_coded,
+                ind_levels = ind_levels,
+                code_master = indcode_list$code_master,
+                sizes = c(ncol(ind_coded), ncol(ind_levels), nrow(indcode_list$code_master)),
+                code_blocks = indcode_list$code_blocks,
+                n_atts = nrow(indcode_list$code_blocks), 
                 task_individual = match_id[start],
                 start = start,
                 end = end,
