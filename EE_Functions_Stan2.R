@@ -770,7 +770,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   cat("Computing Empirical Bayes point estimates with respondent draws and constraints")
  
   con_matrix <- diag(data_stan$con_sign)
-  con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], indcode_list$con_matrix)
+  con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], data_stan$paircon_matrix)
   model_eb <- list(
     func = list(
       pred = env_modfun$PredMNL,
