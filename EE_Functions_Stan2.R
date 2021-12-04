@@ -715,7 +715,7 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
   
   # Convergence charts saved as pdf and in fit_stats
   fit_stats <- data.frame(
-    variable = colnames(data_stan$ind),
+    variable = colnames(data_stan$code_master),
     mean = NA,
     rhat = NA,
     ESS = NA
@@ -750,7 +750,7 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
     fit_stats$ESS[i] <- round(ess_basic(x),1)
     plot(x[,1], type = "l", col = chain_cols[1], ylim = c(min(x), max(x)),
          xlab = "Sample Iteration", ylab = "Mean Beta",
-         main = paste(colnames(data_stan$ind)[i],
+         main = paste(colnames(data_stan$code_master)[i],
                       "| rhat = ", round(rhat(x),2),
                       "| ESS = ", round(ess_basic(x),1)
          ))
