@@ -18,7 +18,7 @@ env_stan <- new.env(parent = emptyenv())
 
 ###############  Coding Functions Environment ################ 
 env_code$setup_cores <- function(ncores){
-  if (file.exists(".GlobalEnv$k_multi_core")){
+  if (exists(".GlobalEnv$k_multi_core")){
     stopCluster(.GlobalEnv$k_multi_core)
     remove(.GlobalEnv$k_multi_core)
   }
