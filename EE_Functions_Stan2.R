@@ -20,7 +20,7 @@ env_stan <- new.env(parent = emptyenv())
 env_code$setup_cores <- function(ncores){
   if (exists(".GlobalEnv$k_multi_core")){
     stopCluster(.GlobalEnv$k_multi_core)
-    remove(.GlobalEnv$k_multi_core)
+    rm(.GlobalEnv$k_multi_core)
   }
   if (ncores >= 1){
     .GlobalEnv$k_multi_core <- makeCluster(min(ncores,detectCores()))
