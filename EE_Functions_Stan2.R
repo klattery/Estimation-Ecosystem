@@ -823,12 +823,19 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   }
   
   if (linux){
-    idseq_all <- seq(1,data_stan$I, by = r_cores * nids_core) # Split data into chunks
+    idseq_all <- seq(1,data_stan$I, by = r_cores * nids_core)
+    if (idseq_all[length(idseq_all)] < data_stan$I){
+      idseq_all <- c(idseq_all, data_stan$I)
+    } 
     nruns <- length(idseq_all) - 1
     betas_eb <- vector(mode = "list", length = nruns)
     preds <- vector(mode = "list", length = nruns)
     for (i in 1:nruns){
-      sub_result <- mclapply(idseq_all[i]:(idseq_all[i+1]-1), id_eb, mc.cores = r_cores)
+      if (i == nruns){
+        sub_result <- mclapply(idseq_all[i]:(idseq_all[i+1]), id_eb, mc.cores = r_cores)
+      } else {
+        sub_result <- mclapply(idseq_all[i]:(idseq_all[i+1]-1), id_eb, mc.cores = r_cores)      
+      } 
       betas_eb[[i]] <- do.call(rbind, lapply(sub_result, function(x) x[[1]]))
       preds[[i]] <- do.call(rbind, lapply(sub_result, function(x) x[[2]]))
       cat(paste0("\n", sprintf("%.1f", 100 * i/nruns), "%"))
