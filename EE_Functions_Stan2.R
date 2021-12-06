@@ -18,7 +18,7 @@ env_stan <- new.env(parent = emptyenv())
 
 ###############  Coding Functions Environment ################ 
 env_code$setup_cores <- function(ncores){
-  if (exists(".GlobalEnv$k_multi_core")){
+  if (exists("k_multi_core", envir = globalenv())){
     stopCluster(.GlobalEnv$k_multi_core)
     rm(.GlobalEnv$k_multi_core)
   }
@@ -663,7 +663,7 @@ env_stan$stan_compile_and_est <- function(data_stan, data_model, dir_stanmodel,s
                  "cd ", dir_stanout, "   # Change to your working directory and then:\n",
                  "  awk 'END { print NR - 45 } ' '",outname,"-1.csv'", "                # Count lines in output\n",
                  "  tail -n +45 '",outname,"-1.csv'  | cut -d, -f 1-300 > temp.csv", "  # Create temp.csv with first 300 columns\n"))
-  HB_model$sample(modifyList(data_stan, data_model),
+  HB_result <- HB_model$sample(modifyList(data_stan, data_model),
                   iter_warmup = data_model$iter_warmup,
                   iter_sampling = data_model$iter_sampling,
                   output_dir = dir_stanout,
@@ -728,8 +728,8 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
       beta_mu <- colMeans(matrix(draws_beta_list[draw,],
                                  data_stan$I,data_stan$P, byrow = TRUE))
     }))
-    matplot(1:nrow(draws_beta_mu[[chain_i]]), draws_beta_mu[[chain_i]],
-            type = "l" , lty = 1, lwd = 1, main = paste0("Chain ", chain_i), xlab = "Iteration", ylab = "Mean Beta")   
+    #matplot(1:nrow(draws_beta_mu[[chain_i]]), draws_beta_mu[[chain_i]],
+    #        type = "l" , lty = 1, lwd = 1, main = paste0("Chain ", chain_i), xlab = "Iteration", ylab = "Mean Beta")   
   } 
   
   pdf(file = file.path(dir_work, pdf_name),   # The directory you want to save the file in
@@ -760,12 +760,104 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
   }
   dev.off()
   write.table(fit_stats, file = file.path(dir_work, paste0(out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
-
-
-
 }
 
-env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, cov_scale){
+env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, cov_scale, linux = TRUE, nids_core = 5){
+  # uses mclapply. Only runs on LINUX 
+  cat("\n")
+  cat("Computing Empirical Bayes point estimates with respondent draws and constraints")
+  
+  con_matrix <- diag(data_stan$con_sign)
+  con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], data_stan$paircon_matrix)
+  model_eb <- list(
+    func = list(
+      pred = env_modfun$PredMNL,
+      min = env_modfun$LL_wPriorPDF,
+      gr = env_modfun$grad_MNLwMVN,
+      logpdf = env_modfun$logpdf_mvnorm
+    ),
+    prior = list(
+      alpha = NULL,
+      cov_inv = NULL, # Cov Inverse 
+      upper_model = rep(TRUE, length(x0)),
+      scale = 1 # scale factor that we will solve for
+    ),
+    con = as.matrix(con_matrix), # must be matrix, 
+    x0 = x0 # starting point inside constraints - use overall mean
+  )
+  
+  id_eb <- function(idseq){
+    end <- idseq * data_stan$P
+    start <- end - data_stan$P + 1
+    resp_draws <- do.call(rbind, lapply(draws_beta$post_warmup_draws, function(x) x[,start:end]))
+    model_id <- model_eb
+    resp_mu <- colMeans(resp_draws)
+    model_id$prior$alpha <- resp_mu
+    model_id$prior$cov_inv <- solve(cov(resp_draws) * cov_scale)
+    
+    id_list <- list()
+    id_filter <- (data_stan$match_id == idseq)
+    task_id <- data_stan$idtask_r[id_filter]
+    task_id_u <- unique(task_id)
+    id_list$idtask_r <- (match(data.frame(t(task_id)), data.frame(t(task_id_u)))) # unique tasks
+    id_list$ind = data_stan$ind[id_filter,]
+    id_list$dep <- as.matrix(data_stan$dep[id_filter]) # Need matrix
+    id_list$wts <- data_stan$wts[id_filter]
+    
+    eb_solve <- constrOptim(theta = model_id$x0, f = model_id$func$min, grad = model_id$func$gr,
+                            ui = model_id$con, ci = rep(0,nrow(model_id$con)), mu = 1e-02, control = list(),
+                            method = "BFGS", outer.iterations = 100, outer.eps = 1e-05, 
+                            data_list = id_list,
+                            model_env = model_id)
+    
+    predprob <- model_id$func$pred(x = eb_solve$par, data_list = id_list)
+    predprob_mu <- model_id$func$pred(x = resp_mu, data_list = id_list)
+    sum_wt <- sum(id_list$dep *id_list$wts)
+    rlh <- exp(sum(log(predprob) * id_list$dep * id_list$wts)/sum_wt)
+    rlh_mu <- exp(sum(log(predprob_mu) * id_list$dep * id_list$wts)/sum_wt)
+    betas <- c(data_stan$resp_id[idseq], rlh, rlh_mu, round(eb_solve$par, 6))
+    names(betas) <- c("id", "rlh_eb", "rlh_mu", colnames(data_stan$ind))
+    preds <- cbind(data_stan$idtask[id_filter,],id_list$dep, id_list$wts, predprob, predprob_mu)
+    result <- list(betas, preds)
+    return(result)
+  }
+  
+  if (linux){
+    idseq_all <- seq(1,data_stan$I, by = r_cores * nids_core) # Split data into chunks
+    nruns <- length(idseq_all) - 1
+    betas_eb <- vector(mode = "list", length = nruns)
+    preds <- vector(mode = "list", length = nruns)
+    for (i in 1:nruns){
+      sub_result <- mclapply(idseq_all[i]:(idseq_all[i+1]-1), id_eb, mc.cores = r_cores)
+      betas_eb[[i]] <- do.call(rbind, lapply(sub_result, function(x) x[[1]]))
+      preds[[i]] <- do.call(rbind, lapply(sub_result, function(x) x[[2]]))
+      cat(paste0("\n", sprintf("%.1f", 100 * i/nruns), "%"))
+    }
+    betas_eb <- do.call(rbind, betas_eb)
+    preds <- do.call(rbind, preds)
+  } else {
+    setup_cores(r_cores)
+    result <- list()
+    result <- foreach(idseq = 1:length(data_stan$resp_id)) %dopar% {
+      result[[idseq]] <- id_eb(idseq)
+    }
+    setup_cores(0) # Close cores
+    betas_eb <- do.call(rbind, lapply(result, function(x) x[[1]]))
+    preds <- do.call(rbind, lapply(result, function(x) x[[2]]))
+  }
+  
+  utilities_r_eb <- betas_eb[,-1:-3]  %*% t(data_stan$code_master) # id, rlh_eb, rlh_mu
+  util_eb_name <- paste0(out_prefix,"_utilities_r_eb.csv")
+  write.table(cbind(betas_eb[,1:3], utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
+  message(paste0("\nEB point estimates in: ",util_eb_name))
+  colnames(preds) <- c("id","task","dep","wts","pred_eb","pred_mu")
+  preds_name <- paste0(out_prefix,"_preds.csv")
+  write.table(preds, file = file.path(dir_work, preds_name), sep = ",", na = ".", row.names = FALSE)  
+  message(paste0("Predictions for your data in: ", preds_name))
+}
+
+
+env_stan$eb_betas_est_old <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, cov_scale){
   cat("\n")
   cat("Computing Empirical Bayes point estimates with respondent draws and constraints")
  
@@ -824,10 +916,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
     preds <- cbind(data_stan$idtask[id_filter,],id_list$dep, id_list$wts, predprob, predprob_mu)
     result[[idseq]] <- list(betas, preds)
   }
-  if (file.exists(".GlobalEnv$k_multi_core")){
-    stopCluster(.GlobalEnv$k_multi_core)
-    remove(.GlobalEnv$k_multi_core)
-  }
+  setup_cores(0) # Close cores
   betas_eb <- do.call(rbind, lapply(result, function(x) x[[1]]))
   preds <- do.call(rbind, lapply(result, function(x) x[[2]]))
 
