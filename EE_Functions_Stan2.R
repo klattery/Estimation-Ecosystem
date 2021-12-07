@@ -648,8 +648,8 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
   cat(paste0(sprintf("%.1f",max(idtask_r)/length(resp_id)),
     " Tasks per Respondent\n"))
   cat(paste0(ncol(indcode_list$code_master)), " coded parameters\n")  
-  cat(paste0("The final utilities will have ", nrow(indcode_list$code_master), " parameters:"))
-  message(rownames(indcode_list$code_master))
+  cat(paste0("The final utilities will have ", nrow(indcode_list$code_master), " parameters:\n"))
+  print(rownames(indcode_list$code_master))
   return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
                 dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
                 ind_coded = ind_coded,
