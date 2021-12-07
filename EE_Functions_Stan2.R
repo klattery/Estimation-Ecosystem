@@ -104,14 +104,11 @@ env_code$remove_implicits<-function(constraints){
   if (nrow(constraints) == 0){
     result <- constraints
   } else {
-    result <- c()
+    result <- NULL
     constraints <- data.frame(constraints) # Tibble does not work
-    for (c in 1:nrow(constraints)){
-      att = constraints[c,1]
-      A = constraints[c,2]
-      B = constraints[c,3]
-      if(!(isImplicit(constraints, c, att, A, B))){
-        result<-rbind(result,constraints[c,])
+    for (i in 1:nrow(constraints)){
+      if(!(isImplicit(constraints, i, constraints[i,1],constraints[i,2], constraints[i,3]))){
+        result<-rbind(result,constraints[i,])
       }
     }
   }
@@ -119,16 +116,16 @@ env_code$remove_implicits<-function(constraints){
 }
 
 env_code$isImplicit <-function(constraints,conrow, att, A, B){
-  nrofcons = nrow(constraints)
+  nrofcons <- nrow(constraints)
   vlag <- FALSE
-  for (c in 1:nrofcons){
-    if(constraints[c, 1] == att && constraints[c, 3] == B && c != conrow){ 
-      bnew <- constraints[c, 2]
+  for (i in 1:nrofcons){
+    if(constraints[i, 1] == att && constraints[i, 3] == B && i != conrow){ 
+      bnew <- constraints[i, 2]
       if(A == bnew){
         vlag <- TRUE
         return(vlag)
       } else {
-        vlag <- isImplicit(constraints,c, att, A, bnew)
+        vlag <- isImplicit(constraints,i, att, A, bnew)
       } 
     }
   }
@@ -627,6 +624,14 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
   if (!is.null(other_data)) {
     other_data <- as.matrix(other_data)[sort_order,]
     } else other_data <- 0
+  # Friendly output
+  cat("2. Prepared data_stan with coded data and constraints\n")
+  cat(paste0(length(resp_id)), " Respondents\n")
+  cat(paste0(sprintf("%.1f",max(idtask_r)/length(resp_id)),
+    " Tasks per Respondent\n"))
+  cat(paste0(ncol(code_master)), " coded parameters\n")  
+  cat(paste0("The final utilities will have ", nrow(data_stan$code_master), " parameters:"))
+  message(rownames(indcode_list$code_master))
   return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
                 dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
                 ind_coded = ind_coded,
@@ -652,18 +657,17 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
                 i_cov = matrix(0, length(resp_id), 0),
                 adapt_delta = .8,
                 wts = wts,
-                other_data = other_data)) # Only Added item in list vs below
+                other_data = other_data)) 
 }  
 
 
 env_stan$stan_compile_and_est <- function(data_stan, data_model, dir_stanmodel,stan_file, outname, out_prefix, dir_work, threads){
   HB_model <- cmdstan_model(file.path(dir_stanmodel,stan_file), quiet = TRUE, cpp_options = list(stan_threads = TRUE))
-
-  message(paste0("Optional lines to run in terminal to check progress:\n",
-                 "cd ", dir_stanout, "   # Change to your working directory and then:\n",
+  cat("While Stan runs, you may check progress in terminal:\n")
+  message(paste0("cd ", dir_stanout, "   # Change to your working directory and then:\n",
                  "  awk 'END { print NR - 45 } ' '",outname,"-1.csv'", "                # Count lines in output\n",
                  "  tail -n +45 '",outname,"-1.csv'  | cut -d, -f 1-300 > temp.csv", "  # Create temp.csv with first 300 columns\n"))
-  HB_result <- HB_model$sample(modifyList(data_stan, data_model),
+  HB_model$sample(modifyList(data_stan, data_model),
                   iter_warmup = data_model$iter_warmup,
                   iter_sampling = data_model$iter_sampling,
                   output_dir = dir_stanout,
@@ -677,6 +681,7 @@ env_stan$stan_compile_and_est <- function(data_stan, data_model, dir_stanmodel,s
                   show_messages = FALSE,
                   validate_csv = FALSE
   )
+  gc()
 }
 
 
@@ -765,7 +770,7 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
 env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, cov_scale, linux = TRUE, nids_core = 5){
   # uses mclapply. Only runs on LINUX 
   cat("\n")
-  cat("Computing Empirical Bayes point estimates with respondent draws and constraints")
+  cat("Computing Empirical Bayes point estimates with respondent draws and constraints (optional):")
   
   con_matrix <- diag(data_stan$con_sign)
   con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], data_stan$paircon_matrix)
