@@ -17,6 +17,24 @@ env_eb <- new.env(parent = emptyenv())
 env_stan <- new.env(parent = emptyenv())
 
 ###############  Coding Functions Environment ################ 
+env_code$read_data <- function(dir_data, data_file){
+  if (!file.exists(file.path(dir_data, data_file))){
+    message(paste0("Cannot find your data file: ", data_file)) 
+    data_in <- "ERROR: NO DATA"
+  } else {
+    ftype <- toupper(substr(data_file,nchar(data_file)-2, nchar(data_file)))
+    if (ftype %in% c("CSV", "RDS")){
+      if (ftype == "CSV") {data_in <- read.csv(file.path(dir_data, data_file), as.is=TRUE)}
+      if (ftype == "RDS") {data_in <- readRDS(file.path(dir_data, data_file))}
+      message("READ DATA INTO R")
+      str(data_in)  
+    } else {
+      message("ERROR: MUST BE .CSV OR .RDS FILE")
+    } 
+  }
+  return(data_in)
+}
+
 env_code$setup_cores <- function(ncores){
   if (exists("k_multi_core", envir = globalenv())){
     stopCluster(.GlobalEnv$k_multi_core)
