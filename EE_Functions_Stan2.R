@@ -20,7 +20,7 @@ env_stan <- new.env(parent = emptyenv())
 env_code$read_data <- function(dir_data, data_file){
   if (!file.exists(file.path(dir_data, data_file))){
     message(paste0("Cannot find your data file: ", data_file)) 
-    data_in <- "ERROR: NO DATA"
+    data_in <- NULL
   } else {
     ftype <- toupper(substr(data_file,nchar(data_file)-2, nchar(data_file)))
     if (ftype %in% c("CSV", "RDS")){
@@ -30,6 +30,7 @@ env_code$read_data <- function(dir_data, data_file){
       str(data_in)  
     } else {
       message("ERROR: MUST BE .CSV OR .RDS FILE")
+      data_in <- NULL
     } 
   }
   return(data_in)
