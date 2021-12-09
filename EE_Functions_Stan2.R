@@ -645,10 +645,10 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
     } else other_data <- 0
   # Friendly output
   cat("2. Prepared data_stan with coded data and constraints\n")
-  cat(paste0(length(resp_id)), " Respondents\n")
-  cat(paste0(sprintf("%.1f",max(idtask_r)/length(resp_id)),
+  cat(paste0("    ",length(resp_id)), " Respondents\n")
+  cat(paste0("    ",sprintf("%.1f",max(idtask_r)/length(resp_id)),
     " Tasks per Respondent\n"))
-  cat(paste0(ncol(indcode_list$code_master)), " coded parameters\n")  
+  cat(paste0("    ", ncol(indcode_list$code_master)), " coded parameters\n")  
   cat(paste0("The final utilities will have ", nrow(indcode_list$code_master), " parameters:\n"))
   print(rownames(indcode_list$code_master))
   return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
