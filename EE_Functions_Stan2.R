@@ -18,22 +18,26 @@ env_stan <- new.env(parent = emptyenv())
 
 ###############  Coding Functions Environment ################ 
 env_code$read_data <- function(dir_data, data_file){
-  if (!file.exists(file.path(dir_data, data_file))){
-    message(paste0("Cannot find your data file: ", data_file)) 
+  if (is.null(data_file)){
     result <- NULL
-  } else {
-    ftype <- toupper(substr(data_file,nchar(data_file)-2, nchar(data_file)))
-    if (ftype %in% c("CSV", "RDS")){
-      if (ftype == "CSV") {result <- read.csv(file.path(dir_data, data_file), as.is=TRUE)}
-      if (ftype == "RDS") {result <- readRDS(file.path(dir_data, data_file))}
-      message("READ DATA INTO R")
-      str(result)  
-    } else {
-      message("ERROR: MUST BE .CSV OR .RDS FILE")
+  } else{
+    if (!file.exists(file.path(dir_data, data_file))){
+      message(paste0("Cannot find your data file: ", data_file)) 
       result <- NULL
-    } 
-  }
-  return(data_in)
+    } else {
+      ftype <- toupper(substr(data_file,nchar(data_file)-2, nchar(data_file)))
+      if (ftype %in% c("CSV", "RDS")){
+        if (ftype == "CSV") {result <- read.csv(file.path(dir_data, data_file), as.is=TRUE)}
+        if (ftype == "RDS") {result <- readRDS(file.path(dir_data, data_file))}
+        message("READ DATA INTO R")
+        str(result)  
+      } else {
+        message("ERROR: MUST BE .CSV OR .RDS FILE")
+        result <- NULL
+      } 
+    } # End normal data file 
+  } # End null
+  return(result)
 }
 
 env_code$setup_cores <- function(ncores){
