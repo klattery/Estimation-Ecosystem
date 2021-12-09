@@ -701,6 +701,7 @@ env_stan$stan_compile_and_est <- function(data_stan, data_model, dir_stanmodel,s
   )
   gc()
 }
+
 env_stan$message_estimation(){
   cat("While Stan runs, you may check progress in terminal:\n")
   message(paste0("cd ", dir_stanout, "   # Change to your working directory and then:\n",
