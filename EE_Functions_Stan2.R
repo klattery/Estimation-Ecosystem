@@ -674,39 +674,43 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
                 prior_cov_scale = 1,
                 P_cov = 0,
                 i_cov = matrix(0, length(resp_id), 0),
-                adapt_delta = .8,
                 wts = wts,
                 other_data = other_data)) 
 }  
 
 
-env_stan$stan_compile_and_est <- function(data_stan, data_model, dir_stanmodel,stan_file, outname, out_prefix, dir_work, threads){
+env_stan$stan_compile_and_est <- function(data_stan, data_model, dir_stanmodel,stan_file, stan_outname, out_prefix, dir_work){
   HB_model <- cmdstan_model(file.path(dir_stanmodel,stan_file), quiet = TRUE, cpp_options = list(stan_threads = TRUE))
   cat("While Stan runs, you may check progress in terminal:\n")
   message(paste0("cd ", dir_stanout, "   # Change to your working directory and then:\n",
-                 "  awk 'END { print NR - 45 } ' '",outname,"-1.csv'", "                # Count lines in output\n",
-                 "  tail -n +45 '",outname,"-1.csv'  | cut -d, -f 1-300 > temp.csv", "  # Create temp.csv with first 300 columns\n"))
+                 "  awk 'END { print NR - 45 } ' '",stan_outname,"-1.csv'", "                # Count lines in output\n",
+                 "  tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > temp.csv", "  # Create temp.csv with first 300 columns\n"))
   HB_model$sample(modifyList(data_stan, data_model),
                   iter_warmup = data_model$iter_warmup,
                   iter_sampling = data_model$iter_sampling,
                   output_dir = dir_stanout,
-                  output_basename = outname,
-                  chains = threads[[1]],
-                  parallel_chains = threads[[2]],
-                  threads_per_chain = threads[[3]],
+                  output_basename = stan_outname,
+                  chains = data_model$chains,
+                  parallel_chains = data_model$parallel_chains,
+                  threads_per_chain = data_model$threads_per_chain,
                   save_warmup = TRUE,
                   refresh = data_model$refresh,
-                  adapt_delta = data_stan$adapt_delta,
+                  adapt_delta = data_model$adapt_delta,
                   show_messages = FALSE,
                   validate_csv = FALSE
   )
   gc()
 }
+env_stan$message_estimation(){
+  cat("While Stan runs, you may check progress in terminal:\n")
+  message(paste0("cd ", dir_stanout, "   # Change to your working directory and then:\n",
+                 "  awk 'END { print NR - 45 } ' '",stan_outname,"-1.csv'", "                # Count lines in output\n",
+                 "  tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > temp.csv", "  # Create temp.csv with first 300 columns\n"))
+}
 
-
-env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outname, out_prefix, dir_work){
+env_stan$checkconverge_export <- function(stan_outname, code_master, resp_id, nchains, dir_stanout, out_prefix, dir_work){
   cat("Reading draws from Stan csv output into R (large files take time)...")
-  csv_name <- do.call(c, lapply(1:nchains, function(i) paste0(outname,"-",i,".csv")))
+  csv_name <- do.call(c, lapply(1:nchains, function(i) paste0(stan_outname,"-",i,".csv")))
   draws_beta <- read_cmdstan_csv(file.path(dir_stanout, csv_name), variables = "beta_ind", format = "draws_list")
   cat("DONE")
   
@@ -731,15 +735,15 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
   .GlobalEnv$draws_beta <- modifyList(draws_beta,list(warmup_draws = NULL))
   utilities <- matrix(
     Reduce("+",lapply(draws_beta$post_warmup_draws, colMeans))/nchains,
-    data_stan$I, data_stan$P,
+    length(resp_id), ncol(code_master),
     byrow = TRUE) # First P entries are respondent 1, next P are resp 2
   .GlobalEnv$utilities <- utilities
-  utilities_r <- utilities %*% t(data_stan$code_master)
-  write.table(cbind(id = data_stan$resp_id, utilities_r), file = file.path(dir_work, util_name), sep = ",", na = ".", row.names = FALSE)
+  utilities_r <- utilities %*% t(code_master)
+  write.table(cbind(id = resp_id, utilities_r), file = file.path(dir_work, util_name), sep = ",", na = ".", row.names = FALSE)
   
   # Convergence charts saved as pdf and in fit_stats
   fit_stats <- data.frame(
-    variable = colnames(data_stan$code_master),
+    variable = colnames(code_master),
     mean = NA,
     rhat = NA,
     ESS = NA
@@ -750,7 +754,7 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
     draws_beta_list <- as.matrix(draws_beta$post_warmup_draws[[chain_i]])
     draws_beta_mu[[chain_i]] <- t(sapply(1:ndraws, function(draw){
       beta_mu <- colMeans(matrix(draws_beta_list[draw,],
-                                 data_stan$I,data_stan$P, byrow = TRUE))
+                                 length(resp_id), ncol(code_master), byrow = TRUE))
     }))
     #matplot(1:nrow(draws_beta_mu[[chain_i]]), draws_beta_mu[[chain_i]],
     #        type = "l" , lty = 1, lwd = 1, main = paste0("Chain ", chain_i), xlab = "Iteration", ylab = "Mean Beta")   
@@ -774,7 +778,7 @@ env_stan$checkconverge_export <- function(data_stan, nchains, dir_stanout, outna
     fit_stats$ESS[i] <- round(ess_basic(x),1)
     plot(x[,1], type = "l", col = chain_cols[1], ylim = c(min(x), max(x)),
          xlab = "Sample Iteration", ylab = "Mean Beta",
-         main = paste(colnames(data_stan$code_master)[i],
+         main = paste(colnames(code_master)[i],
                       "| rhat = ", round(rhat(x),2),
                       "| ESS = ", round(ess_basic(x),1)
          ))
