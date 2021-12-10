@@ -337,10 +337,6 @@ env_code$ordcode <- function(kdata, vname, cut_pts = NULL, thermcode = TRUE, var
   return(list(outcode = ordcode, code_matrix = code_matrix, con_sign = rep(con_sign, ncol(code_matrix)), vnames = varnames, prior = diag(ncol(code_matrix))))
 }
 
-data_in <- data_cov
-att_coding <- specs_cov_coding
-constraints <- NULL
-
 env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
   # Check consistency of specified attributes and constraints with data
   result <- TRUE
