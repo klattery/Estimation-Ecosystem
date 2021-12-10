@@ -363,6 +363,7 @@ env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
 
 env_code$indcode_spec_files <- function(data_in, att_coding, constraints){
   if (is.null(constraints)) constraints <- data.frame(matrix(ncol = 3, nrow = 0))
+  constraints <- remove_implicits(constraints) 
   if (check_atts_constraints(data_in, att_coding,constraints)){
     catcode_types <- c("INDICATOR", "DUMMY","EFFECT","EFFECTS","CATEGORICAL","NOMINAL")
     indcode_spec <- list(nrow(att_coding))
