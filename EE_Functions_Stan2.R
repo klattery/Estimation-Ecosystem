@@ -17,7 +17,7 @@ env_eb <- new.env(parent = emptyenv())
 env_stan <- new.env(parent = emptyenv())
 
 ###############  Coding Functions Environment ################ 
-env_code$read_csv_rds <- function(dir_data, data_file){
+env_code$read_csv_rds <- function(dir_data, data_file, as_name = NULL){
   if (is.null(data_file)){
     result <- NULL
   } else{
@@ -29,8 +29,8 @@ env_code$read_csv_rds <- function(dir_data, data_file){
       if (ftype %in% c("CSV", "RDS")){
         if (ftype == "CSV") {result <- read.csv(file.path(dir_data, data_file), as.is=TRUE)}
         if (ftype == "RDS") {result <- readRDS(file.path(dir_data, data_file))}
-        message("READ DATA INTO R")
-        str(result)  
+        f_inputs <- as.list(match.call(expand.dots = FALSE))
+        message(paste0("\nREAD ", eval(f_inputs[[3]]), " INTO R ", as_name)) # [[1]] is name of function
       } else {
         message("ERROR: MUST BE .CSV OR .RDS FILE")
         result <- NULL
@@ -337,6 +337,10 @@ env_code$ordcode <- function(kdata, vname, cut_pts = NULL, thermcode = TRUE, var
   return(list(outcode = ordcode, code_matrix = code_matrix, con_sign = rep(con_sign, ncol(code_matrix)), vnames = varnames, prior = diag(ncol(code_matrix))))
 }
 
+data_in <- data_cov
+att_coding <- specs_cov_coding
+constraints <- NULL
+
 env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
   # Check consistency of specified attributes and constraints with data
   result <- TRUE
@@ -346,7 +350,7 @@ env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
     att_coding[!check_att,1]
     result <- FALSE
   }
-  if (!is.null(constraints) & nrow(constraints) > 0){
+  if (nrow(constraints) > 0){
     check_match <- constraints[,1, drop = TRUE] %in% att_coding[,1, drop = TRUE]
     if (min(check_match) == 0){
       message("You specified constraints that do no match any attribute in attribute file.  Please fix.")
@@ -358,6 +362,7 @@ env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
 }
 
 env_code$indcode_spec_files <- function(data_in, att_coding, constraints){
+  if (is.null(constraints)) constraints <- data.frame(matrix(ncol = 3, nrow = 0))
   if (check_atts_constraints(data_in, att_coding,constraints)){
     catcode_types <- c("INDICATOR", "DUMMY","EFFECT","EFFECTS","CATEGORICAL","NOMINAL")
     indcode_spec <- list(nrow(att_coding))
@@ -469,6 +474,7 @@ env_code$make_codefiles <- function(indcode_spec){
   return(result)
 }
 
+
 env_code$code_covariates <- function(cov_in, cov_coding, resp_id){
   cov_code_spec <- indcode_spec_files(cov_in, cov_coding, NULL)
   cov_code <- do.call(cbind, lapply(cov_code_spec[sapply(cov_code_spec, length) > 0],
@@ -477,8 +483,8 @@ env_code$code_covariates <- function(cov_in, cov_coding, resp_id){
   no_cov <- is.na(row_match) # Respondents in data with no matching covariate
   row_match[is.na(row_match)] <- 1
   result <- as.matrix(cov_code[row_match,])
-  if (sum(nocov) >0){
-    message(paste0(sum(nocov), " respondents had no covariates.  Coded to 0"))
+  if (sum(no_cov) >0){
+    message(paste0(sum(no_cov), " respondents had no covariates.  Coded to 0"))
     result[no_cov,] <- 0 # set bad to 0
   } else message(paste0("All respondents matched in covariate file.  Coded ", ncol(result), " parameters"))
   return(result)
@@ -662,7 +668,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
     other_data <- as.matrix(other_data)[sort_order,]
     } else other_data <- 0
   # Friendly output
-  cat("2. Prepared data_stan with coded data and constraints\n")
+  cat("Prepared data_stan with coded data and constraints\n")
   cat(paste0("    ",length(resp_id)), " Respondents\n")
   cat(paste0("    ",sprintf("%.1f",max(idtask_r)/length(resp_id)),
     " Tasks per Respondent\n"))
