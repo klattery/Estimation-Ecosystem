@@ -469,7 +469,7 @@ env_code$make_codefiles <- function(indcode_spec){
   return(result)
 }
 
-env_code$code_covariates(cov_in, cov_coding, resp_id){
+env_code$code_covariates <- function(cov_in, cov_coding, resp_id){
   cov_code_spec <- indcode_spec_files(cov_in, cov_coding, NULL)
   cov_code <- do.call(cbind, lapply(cov_code_spec[sapply(cov_code_spec, length) > 0],
                                     function(x) x$outcode)) # coded variables
