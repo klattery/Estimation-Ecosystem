@@ -255,7 +255,6 @@ env_code$usercode1 <- function(kdata, vname, varout = NULL, con_sign = 0){
   return(list(outcode = outcode, code_matrix = code_matrix, con_sign = con_sign, vnames = varout, prior = prior))
 }
 
-
 env_code$usercode <- function(kdata, kcol, varout = NULL){
   if (is.null(varout)){
     varout <- colnames(kdata)[kcol]
