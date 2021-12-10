@@ -43,7 +43,7 @@ env_code$read_csv_rds <- function(dir_data, data_file, as_name = NULL){
 env_code$setup_cores <- function(ncores){
   if (exists("k_multi_core", envir = globalenv())){
     stopCluster(.GlobalEnv$k_multi_core)
-    rm(.GlobalEnv$k_multi_core)
+    rm("k_multi_core", envir = globalenv())
   }
   if (ncores >= 1){
     .GlobalEnv$k_multi_core <- makeCluster(min(ncores,detectCores()))
