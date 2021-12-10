@@ -374,7 +374,7 @@ env_code$indcode_spec_files <- function(data_in, att_coding, constraints){
         }    
       }
       if (att_type == "ORDINAL"){
-        indcode_spec[[i]] <- ordcode(data_in, att_name, con_sign = att_coding[i,3,drop = TRUE])
+        indcode_spec[[i]] <- ordcode(data_in, att_name, thermcode = FALSE, con_sign = att_coding[i,3,drop = TRUE])
       }
       if (att_type == "USERSPECIFIED"){
         indcode_spec[[i]] <- usercode1(data_in, att_name, con_sign = att_coding[i,3,drop = TRUE])
