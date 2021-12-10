@@ -485,7 +485,7 @@ env_code$code_covariates <- function(cov_in, cov_coding, resp_id){
   if (sum(no_cov) >0){
     message(paste0(sum(no_cov), " respondents had no covariates.  Coded to 0"))
     result[no_cov,] <- 0 # set bad to 0
-  } else message(paste0("All respondents matched in covariate file.  Coded ", ncol(result), " parameters"))
+  } else message(paste0("All respondents matched in covariate file.  ", ncol(result), " coded parameters"))
   return(result)
 }
 
