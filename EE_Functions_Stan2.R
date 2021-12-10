@@ -17,7 +17,7 @@ env_eb <- new.env(parent = emptyenv())
 env_stan <- new.env(parent = emptyenv())
 
 ###############  Coding Functions Environment ################ 
-env_code$read_data <- function(dir_data, data_file){
+env_code$read_csv_rds <- function(dir_data, data_file){
   if (is.null(data_file)){
     result <- NULL
   } else{
