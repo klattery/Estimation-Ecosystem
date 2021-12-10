@@ -469,6 +469,21 @@ env_code$make_codefiles <- function(indcode_spec){
   return(result)
 }
 
+env_code$code_covariates(cov_in, resp_id, dir_data, specs_file){
+  cov_coding <- data.frame(read_xlsx(file.path(dir_data,specs_file), sheet = "Cov_Coding", col_types = c("text","text")))
+  cov_code_spec <- indcode_spec_files(cov_in, cov_coding, NULL)
+  cov_code <- do.call(cbind, lapply(cov_code_spec[sapply(cov_code_spec, length) > 0],
+                                    function(x) x$outcode)) # coded variables
+  row_match <- match(resp_id, cov_in[,1])
+  no_cov <- is.na(row_match) # Respondents in data with no mathcin covariate
+  row_match[is.na(row_match)] <- 1
+  result <- as.matrix(cov_code[row_match,])
+  if (sum(nocov) >0){
+    message(paste0(sum(nocov), " respondents had no covariates.  Coded to 0"))
+    result[no_cov,] <- 0 # set bad to 0
+  } 
+  return(result)
+}
 
 env_code$make_con <- function(con_specs, code_master, x0_try){
   # col_pos & col_neg are VECTORS from COLUMNS of code_master
