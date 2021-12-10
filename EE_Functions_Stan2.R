@@ -457,17 +457,20 @@ env_code$make_codefiles <- function(indcode_spec){
   pair_m2 <- pair_m2[(rowSums(pair_m2 != 0) > 0),,drop = FALSE] # keep as matrix
   result$con_matrix <- pair_m2
   
+  return(result)
+}
+
+env_code$save_codemastercon <- function(indcode_list, dir, out_prefix){
+  # Makes a code_master + constraints file and saves it
   # export code matrix, sign, and constraints in 1 file
-  df1 <- rbind(result$code_master, result$con_sign, result$con_matrix)
-  att_labels <- c(rownames(result$code_master), "con_sign")
+  df1 <- rbind(indcode_list$code_master, indcode_list$con_sign, indcode_list$con_matrix)
+  att_labels <- c(rownames(indcode_list$code_master), "con_sign")
   if (nrow(df1) > length(att_labels)){
     more_names <- rep("", nrow(df1) - length(att_labels))
     more_names[1] <- "con_pair(s)"
     att_labels <- c(att_labels, more_names)
   } 
-  write.table(cbind(att_labels, df1), file = file.path(dir_work, paste0(out_prefix,"_code_master.csv")), sep = ",", na = ".", row.names = FALSE)
-  
-  return(result)
+  write.table(cbind(att_labels, df1), file = file.path(dir, paste0(out_prefix,"_code_master_andcon.csv")), sep = ",", na = ".", row.names = FALSE)
 }
 
 
