@@ -17,6 +17,7 @@ env_eb <- new.env(parent = emptyenv())
 env_stan <- new.env(parent = emptyenv())
 
 ###############  Coding Functions Environment ################ 
+
 env_code$read_csv_rds <- function(dir_data, data_file, as_name = NULL){
   if (is.null(data_file)){
     result <- NULL
@@ -727,6 +728,11 @@ env_stan$stan_compile_and_est <- function(data_stan, data_model, dir_stanmodel,s
                   validate_csv = FALSE
   )
   gc()
+}
+
+env_stan$est_best_threads <- function(ncores, ntasks, nchains = 2){
+  threads_per_chain <- min((ncores - 2/nchains), round(.5 + ntasks/(1000)), 24)
+  splitsize <- round(.5 + ntasks/(2 * threads_per_chain))
 }
 
 env_stan$message_estimation <- function(dir, stan_outname){
