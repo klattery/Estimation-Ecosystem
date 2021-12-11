@@ -48,9 +48,9 @@ env_code$setup_cores <- function(ncores){
   if (ncores >= 1){
     .GlobalEnv$k_multi_core <- makeCluster(min(ncores,detectCores()))
     registerDoParallel(.GlobalEnv$k_multi_core)
-    message(paste0("\nUsing ", ncores, " cores.  Set lower if RAM problems"))
+    message(paste0("\nUsing ", ncores, " cores for multi-threading.  Set lower if RAM problems"))
   } else {
-    message("\nParallel threads removed")
+    message("\nAny existing parallel threads now removed")
   }
 }
 
