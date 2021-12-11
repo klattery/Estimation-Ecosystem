@@ -27,7 +27,7 @@ env_code$read_csv_rds <- function(dir_data, data_file, as_name = NULL){
     } else {
       ftype <- toupper(substr(data_file,nchar(data_file)-2, nchar(data_file)))
       if (ftype %in% c("CSV", "RDS")){
-        if (ftype == "CSV") {result <- read.csv(file.path(dir_data, data_file), as.is=TRUE)}
+        if (ftype == "CSV") {result <- read.csv(file.path(dir_data, data_file), as.is=TRUE, check.names = FALSE)}
         if (ftype == "RDS") {result <- readRDS(file.path(dir_data, data_file))}
         f_inputs <- as.list(match.call(expand.dots = FALSE))
         message(paste0("\nREAD ", eval(f_inputs[[3]]), " INTO R ", as_name)) # [[1]] is name of function
@@ -355,6 +355,8 @@ env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
   }
   return(result)
 }
+
+
 
 env_code$indcode_spec_files <- function(data_in, att_coding, constraints){
   if (is.null(constraints)) constraints <- data.frame(matrix(ncol = 3, nrow = 0))
