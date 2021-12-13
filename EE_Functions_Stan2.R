@@ -52,7 +52,7 @@ env_code$setup_cores <- function(ncores){
     registerDoParallel(.GlobalEnv$k_multi_core)
     message(paste0("\nUsing ", ncores, " cores for multi-threading.  Set lower if RAM problems"))
   } else {
-    message("\nAny existing parallel threads now removed")
+    message("\nRemoving parallel threads in R defined by k_multi_core")
   }
 }
 
