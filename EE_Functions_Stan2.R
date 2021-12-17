@@ -359,8 +359,6 @@ env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
   return(result)
 }
 
-
-
 env_code$indcode_spec_files <- function(data_in, att_coding, constraints){
   if (is.null(constraints)) constraints <- data.frame(matrix(ncol = 3, nrow = 0))
   constraints <- remove_implicits(constraints) 
@@ -477,7 +475,6 @@ env_code$save_codemastercon <- function(indcode_list, dir, out_prefix){
   } 
   write.table(cbind(att_labels, df1), file = file.path(dir, paste0(out_prefix,"_code_master_andcon.csv")), sep = ",", na = ".", row.names = FALSE)
 }
-
 
 env_code$code_covariates <- function(cov_in, cov_coding, resp_id){
   cov_code_spec <- indcode_spec_files(cov_in, cov_coding, NULL)
@@ -706,44 +703,14 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
                 other_data = other_data)) 
 }  
 
-
-env_stan$stan_compile_and_est <- function(data_stan, data_model, dir_stanmodel,stan_file, stan_outname, out_prefix, dir_work){
-  HB_model <- cmdstan_model(file.path(dir_stanmodel,stan_file), quiet = TRUE, cpp_options = list(stan_threads = TRUE))
-  cat("While Stan runs, you may check progress in terminal:\n")
-  message(paste0("cd ", dir_stanout, "   # Change to your working directory and then:\n",
-                 "  awk 'END { print NR - 45 } ' '",stan_outname,"-1.csv'", "                # Count lines in output\n",
-                 "  tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > temp.csv", "  # Create temp.csv with first 300 columns\n"))
-  HB_model$sample(modifyList(data_stan, data_model),
-                  iter_warmup = data_model$iter_warmup,
-                  iter_sampling = data_model$iter_sampling,
-                  output_dir = dir_stanout,
-                  output_basename = stan_outname,
-                  chains = data_model$chains,
-                  parallel_chains = data_model$parallel_chains,
-                  threads_per_chain = data_model$threads_per_chain,
-                  save_warmup = TRUE,
-                  refresh = data_model$refresh,
-                  adapt_delta = data_model$adapt_delta,
-                  show_messages = FALSE,
-                  validate_csv = FALSE
-  )
-  gc()
-}
-
-env_stan$est_best_threads <- function(ncores, ntasks, nchains = 2){
-  threads_per_chain <- min((ncores - 2/nchains), round(.5 + ntasks/(1000)), 24)
-  splitsize <- round(.5 + ntasks/(2 * threads_per_chain))
-}
-
 env_stan$message_estimation <- function(dir, stan_outname){
   # For Linux terminal
-  cat("While Stan runs, you may check progress in terminal:\n")
-  message(paste0("cd ", dir$stanout, "   # Change to your working directory and then:\n",
-                 "  awk 'END { print NR - 45 } ' '",stan_outname,"-1.csv'", "                # Count lines in output\n",
-                 "  tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > temp.csv", "  # Create temp.csv with first 300 columns\n"))
+  cat("While Stan runs, you may use terminal to check convergence:\n")
+  message(paste0("cd ", dir$stanout, "   # Change to Stan output directory and then:\n",
+                 "  tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > stan_part.csv", "  # Create stan_part.csv first 300 columns\n"))
 }
 
-env_stan$checkconverge_export <- function(stan_outname, vnames, nchains, dir_stanout, out_prefix, dir_work){
+env_stan$checkconverge_export <- function(stan_outname, dir_stanout, nchains, vnames, out_prefix, dir_work){
   cat("Reading draws from Stan csv output into R (large files take time)...")
   csv_name <- do.call(c, lapply(1:nchains, function(i) paste0(stan_outname,"-",i,".csv")))
   draws_beta <- read_cmdstan_csv(file.path(dir_stanout, csv_name), variables = "beta_ind", format = "draws_list")
@@ -858,11 +825,7 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   } else message(" All respondent mean utilities obey constraints")
 }
 
-
-
-
 env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, cov_scale, linux = TRUE, nids_core = 5){
-  # uses mclapply. Only runs on LINUX 
   cat("\n")
   cat("Computing Empirical Bayes point estimates with respondent draws and constraints (optional):")
   
@@ -960,7 +923,6 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   write.table(preds, file = file.path(dir_work, preds_name), sep = ",", na = ".", row.names = FALSE)  
   message(paste0("EB predictions for data in: ", preds_name))
 }
-
 
 
 env_eb$numder_2 <- function(x, pos, delta = .01){
