@@ -743,7 +743,7 @@ env_stan$message_estimation <- function(dir, stan_outname){
                  "  tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > temp.csv", "  # Create temp.csv with first 300 columns\n"))
 }
 
-env_stan$checkconverge_export <- function(stan_outname, code_master, resp_id, nchains, dir_stanout, out_prefix, dir_work){
+env_stan$checkconverge_export <- function(stan_outname, code_master, nresp, nchains, dir_stanout, out_prefix, dir_work){
   cat("Reading draws from Stan csv output into R (large files take time)...")
   csv_name <- do.call(c, lapply(1:nchains, function(i) paste0(stan_outname,"-",i,".csv")))
   draws_beta <- read_cmdstan_csv(file.path(dir_stanout, csv_name), variables = "beta_ind", format = "draws_list")
@@ -751,12 +751,10 @@ env_stan$checkconverge_export <- function(stan_outname, code_master, resp_id, nc
   
   ### Save output files and check convergence ###
   draws_name <- paste0(out_prefix,"_draws_beta.rds")
-  util_name <- paste0(out_prefix,"_utilities_r.csv")
   pdf_name <- paste0(out_prefix,"_trace_plots.pdf")
   fit_name <-  paste0(out_prefix,"_fit_stats.csv")
   message(paste0(
     "\nSaving post warm-up files for:\n",
-    " respondent point estimates:    ", util_name,"\n",  
     " draws of utilities as R list:  ", draws_name,"\n",
     " convergence stats of mean:     ", fit_name, "\n",
     " PDF of detailed traceplots:    ", pdf_name,"\n",
@@ -768,14 +766,12 @@ env_stan$checkconverge_export <- function(stan_outname, code_master, resp_id, nc
   hist(do.call(rbind,draws_beta$post_warmup_sampler_diagnostics)$accept_stat__, breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
   saveRDS(modifyList(draws_beta,list(warmup_draws = NULL)), file.path(dir_work, draws_name)) # drop warmup
   .GlobalEnv$draws_beta <- modifyList(draws_beta,list(warmup_draws = NULL))
-  utilities <- matrix(
-    Reduce("+",lapply(draws_beta$post_warmup_draws, colMeans))/nchains,
-    length(resp_id), ncol(code_master),
+   utilities <- matrix(
+     Reduce("+",lapply(draws_beta$post_warmup_draws, colMeans))/nchains,
+    nresp, ncol(code_master),
     byrow = TRUE) # First P entries are respondent 1, next P are resp 2
-  .GlobalEnv$utilities <- utilities
-  utilities_r <- utilities %*% t(code_master)
-  write.table(cbind(id = resp_id, utilities_r), file = file.path(dir_work, util_name), sep = ",", na = ".", row.names = FALSE)
-  
+   .GlobalEnv$utilities <- utilities
+    
   # Convergence charts saved as pdf and in fit_stats
   fit_stats <- data.frame(
     variable = colnames(code_master),
@@ -789,7 +785,7 @@ env_stan$checkconverge_export <- function(stan_outname, code_master, resp_id, nc
     draws_beta_list <- as.matrix(draws_beta$post_warmup_draws[[chain_i]])
     draws_beta_mu[[chain_i]] <- t(sapply(1:ndraws, function(draw){
       beta_mu <- colMeans(matrix(draws_beta_list[draw,],
-                                 length(resp_id), ncol(code_master), byrow = TRUE))
+                                 nresp, ncol(code_master), byrow = TRUE))
     }))
     #matplot(1:nrow(draws_beta_mu[[chain_i]]), draws_beta_mu[[chain_i]],
     #        type = "l" , lty = 1, lwd = 1, main = paste0("Chain ", chain_i), xlab = "Iteration", ylab = "Mean Beta")   
@@ -824,6 +820,48 @@ env_stan$checkconverge_export <- function(stan_outname, code_master, resp_id, nc
   dev.off()
   write.table(fit_stats, file = file.path(dir_work, paste0(out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
 }
+
+env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_work){
+  # Compute predictions 
+  pred_all <- do.call(rbind, lapply(1:data_stan$T,
+                function(t){
+                  U <- exp(data_stan$ind[data_stan$start[t]:data_stan$end[t],] %*%
+                           utilities[data_stan$task_individual[t],])
+                  pred <- U/sum(U)
+                  return(pred)
+                }
+  )) # lapply, rbind
+  utilities_r <- utilities %*% t(data_stan$code_master)
+  util_name <- paste0(out_prefix,"_utilities_r.csv")
+  pred_name <- paste0(out_prefix,"_preds_meanpt.csv")
+  failcon_name <- paste0(out_prefix,"_utilities_failcon.csv")
+  
+
+  LL_id <- rowsum(log(pred_all) * data_stan$dep * data_stan$wts, data_stan$match_id)
+  sum_wts <- rowsum(data_stan$dep * data_stan$wts, data_stan$match_id)
+  sum_wts[sum_wts == 0] <- 1
+  header <- cbind(id = data_stan$resp_id, rlh = exp(LL_id/sum_wts))
+  colnames(header) <- c("id","rlh")
+  message(paste0(
+    "\nSaving: \n",
+    " respondent point estimates     : ", util_name,"\n",
+    " predictions for all data rows  : ", pred_name
+  ))
+  write.table(cbind(header, utilities_r), file = file.path(dir_work, util_name), sep = ",", na = ".", row.names = FALSE)
+  write.table(cbind(data_stan$idtask, data_stan$dep, data_stan$wts, pred_all), file = file.path(dir_work, pred_name), sep = ",", na = ".", row.names = FALSE)
+  
+  # Check if utilities meet constraints
+  bad_ids <- rowSums(((utilities %*% t(data_stan$paircon_matrix)) < 0)) > 0
+  bad_ids[c(2,4)] <- TRUE
+  if (sum(bad_ids) > 0){
+    message(paste0(sum(bad_ids), " respondents had reversals from constraints.\n",
+                   "Saved to: ", failcon_name))
+    write.table(cbind(header, utilities_r)[bad_ids,], file = file.path(dir_work, failcon_name), sep = ",", na = ".", row.names = FALSE)
+  } else message("All respondent point utilities obey constraints")
+}
+
+
+
 
 env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, cov_scale, linux = TRUE, nids_core = 5){
   # uses mclapply. Only runs on LINUX 
@@ -927,78 +965,6 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
 }
 
 
-env_stan$eb_betas_est_old <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, cov_scale){
-  cat("\n")
-  cat("Computing Empirical Bayes point estimates with respondent draws and constraints")
- 
-  con_matrix <- diag(data_stan$con_sign)
-  con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], data_stan$paircon_matrix)
-  model_eb <- list(
-    func = list(
-      pred = env_modfun$PredMNL,
-      min = env_modfun$LL_wPriorPDF,
-      gr = env_modfun$grad_MNLwMVN,
-      logpdf = env_modfun$logpdf_mvnorm
-    ),
-    prior = list(
-      alpha = NULL,
-      cov_inv = NULL, # Cov Inverse 
-      upper_model = rep(TRUE, length(x0)),
-      scale = 1 # scale factor that we will solve for
-    ),
-    con = as.matrix(con_matrix), # must be matrix, 
-    x0 = x0 # starting point inside constraints - use overall mean
-  )
-  
-  setup_cores(r_cores)
-  result <- list()
-  result <- foreach(idseq = 1:length(data_stan$resp_id)) %dopar% {
-    end <- idseq * data_stan$P
-    start <- end - data_stan$P + 1
-    resp_draws <- do.call(rbind, lapply(draws_beta$post_warmup_draws, function(x) x[,start:end]))
-    model_id <- model_eb
-    resp_mu <- colMeans(resp_draws)
-    model_id$prior$alpha <- resp_mu
-    model_id$prior$cov_inv <- solve(cov(resp_draws) * cov_scale)
-    
-    id_list <- list()
-    id_filter <- (data_stan$match_id == idseq)
-    task_id <- data_stan$idtask_r[id_filter]
-    task_id_u <- unique(task_id)
-    id_list$idtask_r <- (match(data.frame(t(task_id)), data.frame(t(task_id_u)))) # unique tasks
-    id_list$ind = data_stan$ind[id_filter,]
-    id_list$dep <- as.matrix(data_stan$dep[id_filter]) # Need matrix
-    id_list$wts <- data_stan$wts[id_filter]
-    
-    eb_solve <- constrOptim(theta = model_id$x0, f = model_id$func$min, grad = model_id$func$gr,
-                            ui = model_id$con, ci = rep(0,nrow(model_id$con)), mu = 1e-02, control = list(),
-                            method = "BFGS", outer.iterations = 100, outer.eps = 1e-05, 
-                            data_list = id_list,
-                            model_env = model_id)
-    
-    predprob <- model_id$func$pred(x = eb_solve$par, data_list = id_list)
-    predprob_mu <- model_id$func$pred(x = resp_mu, data_list = id_list)
-    sum_wt <- sum(id_list$dep *id_list$wts)
-    rlh <- exp(sum(log(predprob) * id_list$dep * id_list$wts)/sum_wt)
-    rlh_mu <- exp(sum(log(predprob_mu) * id_list$dep * id_list$wts)/sum_wt)
-    betas <- c(data_stan$resp_id[idseq], rlh, rlh_mu, round(eb_solve$par, 6))
-    names(betas) <- c("id", "rlh_eb", "rlh_mu", colnames(data_stan$ind))
-    preds <- cbind(data_stan$idtask[id_filter,],id_list$dep, id_list$wts, predprob, predprob_mu)
-    result[[idseq]] <- list(betas, preds)
-  }
-  setup_cores(0) # Close cores
-  betas_eb <- do.call(rbind, lapply(result, function(x) x[[1]]))
-  preds <- do.call(rbind, lapply(result, function(x) x[[2]]))
-
-  utilities_r_eb <- betas_eb[,-1:-3]  %*% t(data_stan$code_master) # id, rlh_eb, rlh_mu
-  util_eb_name <- paste0(out_prefix,"_utilities_r_eb.csv")
-  write.table(cbind(betas_eb[,1:3], utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
-  message(paste0("\nEB point estimates in: ",util_eb_name))
-  colnames(preds) <- c("id","task","dep","wts","pred_eb","pred_mu")
-  preds_name <- paste0(out_prefix,"_preds.csv")
-  write.table(preds, file = file.path(dir_work, preds_name), sep = ",", na = ".", row.names = FALSE)  
-  message(paste0("Predictions for your data in: ", preds_name))
-}         
 
 env_eb$numder_2 <- function(x, pos, delta = .01){
   # 2nd derivative
