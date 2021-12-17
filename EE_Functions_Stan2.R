@@ -844,17 +844,16 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   colnames(header) <- c("id","rlh")
   message(paste0(
     "\nSaving: \n",
-    " respondent point estimates     : ", util_name,"\n",
-    " predictions for all data rows  : ", pred_name
+    " Respondent mean utilities      : ", util_name,"\n",
+    " Predictions for all data rows  : ", pred_name
   ))
   write.table(cbind(header, utilities_r), file = file.path(dir_work, util_name), sep = ",", na = ".", row.names = FALSE)
-  write.table(cbind(data_stan$idtask, data_stan$dep, data_stan$wts, pred_all), file = file.path(dir_work, pred_name), sep = ",", na = ".", row.names = FALSE)
+  write.table(cbind(data_stan$idtask, dep = data_stan$dep, wts = data_stan$wts, pred = pred_all), file = file.path(dir_work, pred_name), sep = ",", na = ".", row.names = FALSE)
   
   # Check if utilities meet constraints
   bad_ids <- rowSums(((utilities %*% t(data_stan$paircon_matrix)) < 0)) > 0
-  bad_ids[c(2,4)] <- TRUE
   if (sum(bad_ids) > 0){
-    message(paste0(sum(bad_ids), " respondents had reversals from constraints.\n",
+    message(paste0(sum(bad_ids), " Respondents had reversals from constraints.\n",
                    "Saved to: ", failcon_name))
     write.table(cbind(header, utilities_r)[bad_ids,], file = file.path(dir_work, failcon_name), sep = ",", na = ".", row.names = FALSE)
   } else message("All respondent point utilities obey constraints")
