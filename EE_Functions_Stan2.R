@@ -743,10 +743,12 @@ env_stan$message_estimation <- function(dir, stan_outname){
                  "  tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > temp.csv", "  # Create temp.csv with first 300 columns\n"))
 }
 
-env_stan$checkconverge_export <- function(stan_outname, code_master, nresp, nchains, dir_stanout, out_prefix, dir_work){
+env_stan$checkconverge_export <- function(stan_outname, vnames, nchains, dir_stanout, out_prefix, dir_work){
   cat("Reading draws from Stan csv output into R (large files take time)...")
   csv_name <- do.call(c, lapply(1:nchains, function(i) paste0(stan_outname,"-",i,".csv")))
   draws_beta <- read_cmdstan_csv(file.path(dir_stanout, csv_name), variables = "beta_ind", format = "draws_list")
+  nresp <- draws_beta$metadata$stan_variable_dims$beta_ind[2] # num respondents
+  npar <- draws_beta$metadata$stan_variable_dims$beta_ind[1]
   cat("DONE")
   
   ### Save output files and check convergence ###
@@ -765,13 +767,13 @@ env_stan$checkconverge_export <- function(stan_outname, code_master, nresp, ncha
   .GlobalEnv$draws_beta <- modifyList(draws_beta,list(warmup_draws = NULL))
    utilities <- matrix(
      Reduce("+",lapply(draws_beta$post_warmup_draws, colMeans))/nchains,
-    nresp, ncol(code_master),
+    nresp, npar,
     byrow = TRUE) # First P entries are respondent 1, next P are resp 2
    .GlobalEnv$utilities <- utilities
     
   # Convergence charts saved as pdf and in fit_stats
   fit_stats <- data.frame(
-    variable = colnames(code_master),
+    variable = vnames,
     mean = NA,
     rhat = NA,
     ESS = NA
@@ -782,7 +784,7 @@ env_stan$checkconverge_export <- function(stan_outname, code_master, nresp, ncha
     draws_beta_list <- as.matrix(draws_beta$post_warmup_draws[[chain_i]])
     draws_beta_mu[[chain_i]] <- t(sapply(1:ndraws, function(draw){
       beta_mu <- colMeans(matrix(draws_beta_list[draw,],
-                                 nresp, ncol(code_master), byrow = TRUE))
+                                 nresp, npar, byrow = TRUE))
     }))
     #matplot(1:nrow(draws_beta_mu[[chain_i]]), draws_beta_mu[[chain_i]],
     #        type = "l" , lty = 1, lwd = 1, main = paste0("Chain ", chain_i), xlab = "Iteration", ylab = "Mean Beta")   
@@ -806,7 +808,7 @@ env_stan$checkconverge_export <- function(stan_outname, code_master, nresp, ncha
     fit_stats$ESS[i] <- round(ess_basic(x),1)
     plot(x[,1], type = "l", col = chain_cols[1], ylim = c(min(x), max(x)),
          xlab = "Sample Iteration", ylab = "Mean Beta",
-         main = paste(colnames(code_master)[i],
+         main = paste(vnames[i],
                       "| rhat = ", round(rhat(x),2),
                       "| ESS = ", round(ess_basic(x),1)
          ))
@@ -840,9 +842,9 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   header <- cbind(id = data_stan$resp_id, rlh = exp(LL_id/sum_wts))
   colnames(header) <- c("id","rlh")
   message(paste0(
-    "\nSaving: \n",
-    " Predictions for all data rows  : ", pred_name, "\n",
-    " Respondent mean utilities      : ", util_name
+    "Saving: \n",
+    " Predictions for data     : ", pred_name, "\n",
+    " Respondent mean utilities: ", util_name
   ))
   write.table(cbind(header, utilities_r), file = file.path(dir_work, util_name), sep = ",", na = ".", row.names = FALSE)
   write.table(cbind(data_stan$idtask, dep = data_stan$dep, wts = data_stan$wts, pred = pred_all), file = file.path(dir_work, pred_name), sep = ",", na = ".", row.names = FALSE)
@@ -952,7 +954,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   utilities_r_eb <- betas_eb[,-1:-2]  %*% t(data_stan$code_master) # id, rlh_eb
   util_eb_name <- paste0(out_prefix,"_utilities_r_eb.csv")
   write.table(cbind(betas_eb[,1:2], utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
-  message(paste0("\nEB point estimates in:    ",util_eb_name))
+  message(paste0("\nEB point estimates in:      ",util_eb_name))
   colnames(preds) <- c("id","task","dep","wts","pred_eb")
   preds_name <- paste0(out_prefix,"_preds_EB.csv")
   write.table(preds, file = file.path(dir_work, preds_name), sep = ",", na = ".", row.names = FALSE)  
