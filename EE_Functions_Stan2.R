@@ -23,7 +23,7 @@ env_code$read_csv_rds <- function(dir_data, data_file, as_name = NULL){
     result <- NULL
   } else{
     if (!file.exists(file.path(dir_data, data_file))){
-      message(paste0("Cannot find your data file: ", data_file)) 
+      message(paste0("ERROR: CANNOT FIND YOUR DATA FILE: ", data_file)) 
       result <- NULL
     } else {
       ftype <- toupper(substr(data_file,nchar(data_file)-2, nchar(data_file)))
@@ -33,7 +33,7 @@ env_code$read_csv_rds <- function(dir_data, data_file, as_name = NULL){
         f_inputs <- as.list(match.call(expand.dots = FALSE))
         message(paste0("\nREAD ", eval(f_inputs[[3]]), " INTO R ", as_name)) # [[1]] is name of function
       } else {
-        message("ERROR: MUST BE .CSV OR .RDS FILE")
+        message("ERROR: DATA MUST BE .CSV OR .RDS FILE")
         result <- NULL
       } 
     } # End normal data file 
