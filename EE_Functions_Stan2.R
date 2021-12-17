@@ -705,9 +705,10 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
 
 env_stan$message_estimation <- function(dir, stan_outname){
   # For Linux terminal
-  cat("While Stan runs, you may use terminal to check convergence:\n")
+  cat("While Stan runs, you may check convergence with Stan csv output.\n")
+  cat("To create smaller file (stan_part) of 1st 300 columns using Linux terminal:\n")
   message(paste0("cd ", dir$stanout, "   # Change to Stan output directory and then:\n",
-                 "  tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > stan_part.csv", "  # Create stan_part.csv first 300 columns\n"))
+                 "tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > stan_part.csv"))
 }
 
 env_stan$checkconverge_export <- function(stan_outname, dir_stanout, nchains, vnames, out_prefix, dir_work){
