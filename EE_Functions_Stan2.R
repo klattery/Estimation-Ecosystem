@@ -757,7 +757,7 @@ env_stan$checkconverge_export <- function(stan_outname, code_master, nresp, ncha
     "\nSaving post warm-up files for:\n",
     " draws of utilities as R list:  ", draws_name,"\n",
     " convergence stats of mean:     ", fit_name, "\n",
-    " PDF of detailed traceplots:    ", pdf_name,"\n",
+    " PDF of detailed traceplots:    ", pdf_name,"\n"
   ))
   
   hist(do.call(rbind,draws_beta$post_warmup_sampler_diagnostics)$accept_stat__, breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
