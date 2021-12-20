@@ -412,6 +412,8 @@ env_code$make_codefiles <- function(indcode_spec){
   # Create two files: coded and uncoded levels, and a combined version for R
   ind_coded <- NULL # coded data
   ind_levels <- NULL # uncoded (will be coded in Stan)
+  ind_coded <- matrix(0, nrow(indcode_spec[[1]]$outcode),0)
+  ind_levels <- matrix(0, nrow(indcode_spec[[1]]$outcode),0)
   col_beg <- 1 # code_matrix col
   row_beg <- 1 # code_matrix row
   coded_beg <- 1 # column of coded data
