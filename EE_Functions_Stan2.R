@@ -745,6 +745,7 @@ env_stan$checkconverge_export <- function(stan_outname, dir_stanout, nchains, vn
   fit_stats <- data.frame(
     variable = vnames,
     mean = NA,
+    sd =  NA,
     rhat = NA,
     ESS = NA
   )
@@ -774,6 +775,7 @@ env_stan$checkconverge_export <- function(stan_outname, dir_stanout, nchains, vn
       draws_beta_mu[[chain]][,i]     
     }) # x is set of column i across draws_beta_mu
     fit_stats$mean[i] <- round(mean(x), 2)
+    fit_stats$sd[i] <- round(sd(x),2)
     fit_stats$rhat[i] <- round(rhat(x),2)
     fit_stats$ESS[i] <- round(ess_basic(x),1)
     plot(x[,1], type = "l", col = chain_cols[1], ylim = c(min(x), max(x)),
