@@ -365,6 +365,7 @@ env_code$indcode_spec_files <- function(data_in, att_coding, constraints){
   if (check_atts_constraints(data_in, att_coding,constraints)){
     catcode_types <- c("INDICATOR", "DUMMY","EFFECT","EFFECTS","CATEGORICAL","NOMINAL")
     indcode_spec <- list(nrow(att_coding))
+    
     for (i in 1:nrow(att_coding)){
       att_name <- att_coding[i,1,drop = TRUE]
       att_type <- toupper(att_coding[i,2,drop = TRUE]) # UPPERCASE
@@ -381,7 +382,7 @@ env_code$indcode_spec_files <- function(data_in, att_coding, constraints){
       }
       if (att_type == "USERSPECIFIED"){
         indcode_spec[[i]] <- usercode1(data_in, att_name, con_sign = att_coding[i,3,drop = TRUE])
-       }
+      }
     }  
     indcode_spec <- setNames(indcode_spec,att_coding[,1,drop = TRUE])
   } else indcode_spec <- "Error: Data file, attributes, constraints do not match" 
@@ -408,7 +409,7 @@ env_code$make_codefiles <- function(indcode_spec){
   result <- list()
   indcode_list <- indcode_spec[sapply(indcode_spec, length) > 0] # remove NULL elements
   names(indcode_list) <- NULL # to avoid adding to vnames
-
+  
   # Create two files: coded and uncoded levels, and a combined version for R
   ind_coded <- NULL # coded data
   ind_levels <- NULL # uncoded (will be coded in Stan)
@@ -491,6 +492,19 @@ env_code$code_covariates <- function(cov_in, cov_coding, resp_id){
     result[no_cov,] <- 0 # set bad to 0
   } else message(paste0("All respondents matched in covariate file.  ", ncol(result), " coded parameters"))
   return(result)
+}
+
+env_code$make_wts <- function(cov_in, resp_id){
+  # cov_in has id, weight for first 2 columns
+  wts <- cov_in[,2,drop = TRUE]
+  result <- wts[match(resp_id, cov_in[,1])]
+  if (sum(is.na(result)) > 0){
+    cat(paste0(sum(is.na(result)), " respondents in data_stan have no matching weights.  These weigts are set to 1"))
+  }
+  result[is.na(result)] <- 1
+  cat("Weights used from column 2 of covariates file:\n")
+  print(summary(result))
+  return(wts_match)
 }
 
 env_code$make_con <- function(con_specs, code_master, x0_try){
@@ -669,40 +683,40 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
   start <- c(1, end[-length(end)]+1)
   if (!is.null(other_data)) {
     other_data <- as.matrix(other_data)[sort_order,]
-    } else other_data <- 0
+  } else other_data <- 0
   # Friendly output
   cat("Prepared data_stan with coded data and constraints\n")
   cat(paste0("    ",length(resp_id)), " Respondents\n")
   cat(paste0("    ",sprintf("%.1f",max(idtask_r)/length(resp_id)),
-    " Tasks per Respondent\n"))
+             " Tasks per Respondent\n"))
   cat(paste0("    ", ncol(indcode_list$code_master)), " coded parameters\n")  
   cat(paste0("The final utilities will have ", nrow(indcode_list$code_master), " parameters:\n"))
   print(rownames(indcode_list$code_master))
   return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
-                dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
-                ind_coded = ind_coded,
-                ind_levels = ind_levels,
-                code_master = indcode_list$code_master,
-                sizes = c(ncol(ind_coded), ncol(ind_levels), nrow(indcode_list$code_master)),
-                code_blocks = indcode_list$code_blocks,
-                n_atts = nrow(indcode_list$code_blocks), 
-                task_individual = match_id[start],
-                start = start,
-                end = end,
-                con_sign = indcode_list$con_sign,
-                prior_cov = indcode_list$indprior,
-                code_master = indcode_list$code_master,
-                paircon_rows = nrow(indcode_list$con_matrix),
-                paircon_matrix = indcode_list$con_matrix,
-                df = 2,
-                prior_alpha = rep(0, ncol(ind)),
-                a_sig = 10,
-                cov_block = matrix(1, ncol(ind), ncol(ind)),
-                prior_cov_scale = 1,
-                P_cov = 0,
-                i_cov = matrix(0, length(resp_id), 0),
-                wts = wts,
-                other_data = other_data)) 
+              dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
+              ind_coded = ind_coded,
+              ind_levels = ind_levels,
+              code_master = indcode_list$code_master,
+              sizes = c(ncol(ind_coded), ncol(ind_levels), nrow(indcode_list$code_master)),
+              code_blocks = indcode_list$code_blocks,
+              n_atts = nrow(indcode_list$code_blocks), 
+              task_individual = match_id[start],
+              start = start,
+              end = end,
+              con_sign = indcode_list$con_sign,
+              prior_cov = indcode_list$indprior,
+              code_master = indcode_list$code_master,
+              paircon_rows = nrow(indcode_list$con_matrix),
+              paircon_matrix = indcode_list$con_matrix,
+              df = 2,
+              prior_alpha = rep(0, ncol(ind)),
+              a_sig = 10,
+              cov_block = matrix(1, ncol(ind), ncol(ind)),
+              prior_cov_scale = 1,
+              P_cov = 0,
+              i_cov = matrix(0, length(resp_id), 0),
+              wts = wts,
+              other_data = other_data)) 
 }  
 
 env_stan$message_estimation <- function(dir, stan_outname){
@@ -735,12 +749,12 @@ env_stan$checkconverge_export <- function(stan_outname, dir_stanout, nchains, vn
   hist(do.call(rbind,draws_beta$post_warmup_sampler_diagnostics)$accept_stat__, breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
   saveRDS(modifyList(draws_beta,list(warmup_draws = NULL)), file.path(dir_work, draws_name)) # drop warmup
   .GlobalEnv$draws_beta <- modifyList(draws_beta,list(warmup_draws = NULL))
-   utilities <- matrix(
-     Reduce("+",lapply(draws_beta$post_warmup_draws, colMeans))/nchains,
+  utilities <- matrix(
+    Reduce("+",lapply(draws_beta$post_warmup_draws, colMeans))/nchains,
     nresp, npar,
     byrow = TRUE) # First P entries are respondent 1, next P are resp 2
-   .GlobalEnv$utilities <- utilities
-    
+  .GlobalEnv$utilities <- utilities
+  
   # Convergence charts saved as pdf and in fit_stats
   fit_stats <- data.frame(
     variable = vnames,
@@ -795,19 +809,19 @@ env_stan$checkconverge_export <- function(stan_outname, dir_stanout, nchains, vn
 env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_work){
   # Compute predictions 
   pred_all <- do.call(rbind, lapply(1:data_stan$T,
-                function(t){
-                  U <- exp(data_stan$ind[data_stan$start[t]:data_stan$end[t],] %*%
-                           utilities[data_stan$task_individual[t],])
-                  pred <- U/sum(U)
-                  return(pred)
-                }
+                      function(t){
+                        U <- exp(data_stan$ind[data_stan$start[t]:data_stan$end[t],] %*%
+                                 utilities[data_stan$task_individual[t],])
+                        pred <- U/sum(U)
+                        return(pred)
+                      }
   )) # lapply, rbind
   utilities_r <- utilities %*% t(data_stan$code_master)
   util_name <- paste0(out_prefix,"_utilities_r.csv")
   pred_name <- paste0(out_prefix,"_preds_meanpt.csv")
   failcon_name <- paste0(out_prefix,"_utilities_failcon.csv")
   
-
+  
   LL_id <- rowsum(log(pred_all) * data_stan$dep * data_stan$wts, data_stan$match_id)
   sum_wts <- rowsum(data_stan$dep * data_stan$wts, data_stan$match_id)
   sum_wts[sum_wts == 0] <- 1
@@ -1057,12 +1071,12 @@ env_eb$mleb <- function(data_list, model_list, mleb_control){
         result <- model_env$SolveID(idseq = i, data_list=data_list, model_env = model_env)
         result$betas
       }
-
+      
       # store results
       #extfit <- test_util(eb_betas[, 1], eb_betas[, -1:-2], data_conj_hold)$rlh_mean # optional ext holdout
       extfit <- NA
       prior_cov <- solve(model_env$prior$scale * model_env$prior$cov_inv)
-
+      
       cov_size <- mean(diag(prior_cov))
       kscale_hist[iter,] <- c(kscale, scale_find$optim_y, rlh_hold, extfit, cov_size)
       model_env$mleb_result$kscale_hist <- kscale_hist
@@ -1088,7 +1102,7 @@ env_eb$mleb <- function(data_list, model_list, mleb_control){
       model_env$prior$scale <- 1 # set to 1 just for cleanliness
       model_env$x0 <- alpha_r # Update x0 to match alpha (Nov 2020)
       save(mleb_result, file = file.path(mleb_control$dir_pdf, "mleb_result.RData"), envir = model_env)
- 
+      
       # print
       #cat(rep("\n", 3))
       cat("\014")
@@ -1098,7 +1112,7 @@ env_eb$mleb <- function(data_list, model_list, mleb_control){
       tpi <- (Sys.time() - time_beg_iter) 
       units(tpi) <- "mins"
       message(paste0("  Time for iteration ", iter, " was: ", format(tpi, digits = 3)))
- 
+      
       # Check for convergence
       fit <- kscale_hist[,3]
       fit <- fit[!is.na(fit)]
@@ -1183,7 +1197,7 @@ env_eb$next_cov <- function(prior_alpha, betas,
   # prior mean and cov are alpha and prior_cov
   # betas are respondent level betas
   # v0 is total degrees of freedom (must be > ncol(betas)), k0 is n size basis of alpha
- 
+  
   n <- nrow(betas)
   p <- ncol(betas)
   add_z <- matrix(rnorm(n * p)/1000, nrow = n, ncol = p) # Add small random error
@@ -1351,8 +1365,8 @@ env_eb$prep_file <- function(idtaskdep, indcode_list, train = TRUE, other_data =
                 prior_cov = indcode_list$indprior,
                 code_master = indcode_list$code_master,
                 wts = wts))
-    }  
-  }
+  }  
+}
 
 env_eb$con_trivial <- function(num_par, umin = -999){
   # Make trivial constraint: first util > -999
@@ -1481,8 +1495,4 @@ attach(env_modfun)
 attach(env_eb)
 attach(env_stan)
 
-# 1) Scale as mean(previous prior,  scale * current) 
-# 2) Future test Likelihood of beta is average of likelihoods from multiple Priors
-# 3) Use predicted values of 1st solution and boost
-# 4) Boost during iterations w1 * (prior + (w2 * newprior)
 
