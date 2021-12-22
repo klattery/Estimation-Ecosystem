@@ -504,7 +504,7 @@ env_code$make_wts <- function(cov_in, resp_id){
   result[is.na(result)] <- 1
   cat("Weights used from column 2 of covariates file:\n")
   print(summary(result))
-  return(wts_match)
+  return(result)
 }
 
 env_code$make_con <- function(con_specs, code_master, x0_try){
