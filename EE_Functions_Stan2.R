@@ -727,14 +727,11 @@ env_stan$message_estimation <- function(dir, stan_outname){
                  "tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > stan_part.csv"))
 }
 
-env_stan$checkconverge_export <- function(stan_outname, dir_stanout, nchains, vnames, out_prefix, dir_work){
-  cat("Reading draws from Stan csv output into R (large files take time)...")
-  csv_name <- do.call(c, lapply(1:nchains, function(i) paste0(stan_outname,"-",i,".csv")))
-  draws_beta <- read_cmdstan_csv(file.path(dir_stanout, csv_name), variables = "beta_ind", format = "draws_list")
+env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_work){
+  nchains <- length(draws_beta$post_warmup_draws)
   nresp <- draws_beta$metadata$stan_variable_dims$beta_ind[2] # num respondents
   npar <- draws_beta$metadata$stan_variable_dims$beta_ind[1]
-  cat("DONE")
-  
+
   ### Save output files and check convergence ###
   draws_name <- paste0(out_prefix,"_draws_beta.rds")
   pdf_name <- paste0(out_prefix,"_trace_plots.pdf")
@@ -747,14 +744,8 @@ env_stan$checkconverge_export <- function(stan_outname, dir_stanout, nchains, vn
   ))
   
   hist(do.call(rbind,draws_beta$post_warmup_sampler_diagnostics)$accept_stat__, breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
-  saveRDS(modifyList(draws_beta,list(warmup_draws = NULL)), file.path(dir_work, draws_name)) # drop warmup
-  .GlobalEnv$draws_beta <- modifyList(draws_beta,list(warmup_draws = NULL))
-  utilities <- matrix(
-    Reduce("+",lapply(draws_beta$post_warmup_draws, colMeans))/nchains,
-    nresp, npar,
-    byrow = TRUE) # First P entries are respondent 1, next P are resp 2
-  .GlobalEnv$utilities <- utilities
-  
+  saveRDS(draws_beta, file.path(dir_work, draws_name)) # drop warmup
+
   # Convergence charts saved as pdf and in fit_stats
   fit_stats <- data.frame(
     variable = vnames,
@@ -771,8 +762,6 @@ env_stan$checkconverge_export <- function(stan_outname, dir_stanout, nchains, vn
       beta_mu <- colMeans(matrix(draws_beta_list[draw,],
                                  nresp, npar, byrow = TRUE))
     }))
-    #matplot(1:nrow(draws_beta_mu[[chain_i]]), draws_beta_mu[[chain_i]],
-    #        type = "l" , lty = 1, lwd = 1, main = paste0("Chain ", chain_i), xlab = "Iteration", ylab = "Mean Beta")   
   } 
   
   pdf(file = file.path(dir_work, pdf_name),   # The directory you want to save the file in
