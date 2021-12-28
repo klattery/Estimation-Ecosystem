@@ -733,6 +733,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
               P_cov = 0,
               i_cov = matrix(0, length(resp_id), 0),
               wts = wts,
+              x0 = indcode_list$x0,
               other_data = other_data)) 
 }  
 
