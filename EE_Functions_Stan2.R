@@ -463,6 +463,23 @@ env_code$make_codefiles <- function(indcode_spec){
   pair_m2 <- pair_m2[(rowSums(pair_m2 != 0) > 0),,drop = FALSE] # keep as matrix
   result$con_matrix <- pair_m2
   
+  # Find initial x0 satisfying constraints
+  con_matrix <- diag(result$con_sign)
+  if (nrow(result$paircon_matrix) == 0){
+    result$x0 <- con_sign/10
+  } else {
+    con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], result$paircon_matrix)
+    hinge <- function(xvec, kmatrix){
+      kprod <- kmatrix %*% xvec
+      result <- 1000 * sum(log(1+ exp(-100 * kprod)))
+      return(result)
+    }
+    x0 <- optim(par = rep(0, ncol(con_matrix)), fn = hinge, method = "L-BFGS-B", lower = -2, upper = 2, kmatrix = con_matrix)$par/5
+    check <- con_matrix %*% x0
+    if (min(check) <= 0) cat("Could not find initial x0 that satisfies constraints. \nSet indcode_list$x0 manually if using EB")
+    result$x0 <- x0
+  }
+  
   return(result)
 }
 
