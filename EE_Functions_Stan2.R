@@ -464,10 +464,10 @@ env_code$make_codefiles <- function(indcode_spec){
   result$con_matrix <- pair_m2
   
   # Find initial x0 satisfying constraints
-  con_matrix <- diag(result$con_sign)
   if (nrow(result$paircon_matrix) == 0){
     result$x0 <- con_sign/10
   } else {
+    con_matrix <- diag(result$con_sign)
     con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], result$paircon_matrix)
     hinge <- function(xvec, kmatrix){
       kprod <- kmatrix %*% xvec
