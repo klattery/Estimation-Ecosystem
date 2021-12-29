@@ -480,6 +480,11 @@ env_code$make_codefiles <- function(indcode_spec){
     result$x0 <- x0
   }
   
+  # Check for collinearity
+  ksvd <- svd(cor(result$indcode))
+  result$cor_eigenvalues <- ksvd$d
+  if (min(ksvd$d) < 1e-10) cat("YOUR DESIGN IS LIKELY DEFICIENT. Check indcode_list$cor_eigenvalues")
+  
   return(result)
 }
 
