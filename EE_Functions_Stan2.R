@@ -464,8 +464,8 @@ env_code$make_codefiles <- function(indcode_spec){
   result$con_matrix <- pair_m2
   
   # Find initial x0 satisfying constraints
-  if (nrow(result$paircon_matrix) == 0){
-    result$x0 <- con_sign/10
+  if (is.null(nrow(result$paircon_matrix))){
+    result$x0 <- result$con_sign/10
   } else {
     con_matrix <- diag(result$con_sign)
     con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], result$paircon_matrix)
@@ -479,12 +479,7 @@ env_code$make_codefiles <- function(indcode_spec){
     if (min(check) <= 0) cat("Could not find initial x0 that satisfies constraints. \nSet indcode_list$x0 manually if using EB")
     result$x0 <- x0
   }
-  
-  # Check for collinearity
-  ksvd <- svd(cor(result$indcode))
-  result$cor_eigenvalues <- ksvd$d
-  if (min(ksvd$d) < 1e-10) cat("YOUR DESIGN IS LIKELY DEFICIENT. Check indcode_list$cor_eigenvalues")
-  
+
   return(result)
 }
 
@@ -512,7 +507,7 @@ env_code$code_covariates <- function(cov_in, cov_coding, resp_id){
   if (sum(no_cov) >0){
     message(paste0(sum(no_cov), " respondents had no covariates.  Coded to 0"))
     result[no_cov,] <- 0 # set bad to 0
-  } else message(paste0("All respondents matched in covariate file.  ", ncol(result), " coded parameters"))
+  } else message(paste0("All respondents matched in covariates file.  ", ncol(result), " coded parameters"))
   return(result)
 }
 
@@ -714,6 +709,14 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
   cat(paste0("    ", ncol(indcode_list$code_master)), " coded parameters\n")  
   cat(paste0("The final utilities will have ", nrow(indcode_list$code_master), " parameters:\n"))
   print(rownames(indcode_list$code_master))
+  
+  # Check for collinearity
+  ksvd <- svd(cor(ind))
+  if (min(ksvd$d) < 1e-10) cat(paste0("\n############################################",
+                                      "\nWARNING!!!! YOUR DESIGN IS LIKELY DEFICIENT.",
+                                      "\nSmall values in data_stan$cor_eigenvalues",
+                                      "\n############################################\n"))
+  
   return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
               dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
               ind_coded = ind_coded,
@@ -739,6 +742,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other
               i_cov = matrix(0, length(resp_id), 0),
               wts = wts,
               x0 = indcode_list$x0,
+              cor_eigenvalues = ksvd$d,
               other_data = other_data)) 
 }  
 
@@ -848,7 +852,9 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   write.table(cbind(data_stan$idtask, dep = data_stan$dep, wts = data_stan$wts, pred = pred_all), file = file.path(dir_work, pred_name), sep = ",", na = ".", row.names = FALSE)
   
   # Check if utilities meet constraints
-  bad_ids <- rowSums(((utilities %*% t(data_stan$paircon_matrix)) < 0)) > 0
+  con_matrix <- diag(data_stan$con_sign)
+  con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], data_stan$paircon_matrix)
+  bad_ids <- rowSums(((utilities %*% t(con_matrix)) < 0)) > 0
   if (sum(bad_ids) > 0){
     message(paste0(sum(bad_ids), " Respondents had reversals from constraints.\n",
                    "Reversals saved to: ", failcon_name))
