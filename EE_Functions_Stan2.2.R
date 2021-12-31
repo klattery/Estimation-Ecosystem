@@ -681,7 +681,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, check
   result$ind <- as.matrix(indcode_list$indcode[sort_order,])
   result$ind_coded <- as.matrix(indcode_list$ind_coded[sort_order,])
   result$ind_levels <- as.matrix(indcode_list$ind_levels[sort_order,])
-  result$sizes <- c(ncol(ind_coded), ncol(ind_levels), nrow(indcode_list$code_master))
+  result$sizes <- c(ncol(result$ind_coded), ncol(result$ind_levels), nrow(indcode_list$code_master))
   
   dep <- as.vector(as.matrix(idtaskdep[sort_order, 3]))
   idtask <- data.frame(idtaskdep[sort_order, 1:2])
