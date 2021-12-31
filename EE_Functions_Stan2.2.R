@@ -717,8 +717,8 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, check
   # Check for collinearity
   if (check_collinearity){
     cat("\nChecking collinearity...")
-    result$cor_eigen <- eigen(coop::pcor(ind),only.values = TRUE, symmetric = TRUE)$values 
-    if (min(cor_eigen) < 1e-10){
+    result$cor_eigen <- eigen(coop::pcor(result$ind),only.values = TRUE, symmetric = TRUE)$values 
+    if (min(result$cor_eigen) < 1e-10){
       cat(paste0("\n############################################",
                  "\nWARNING!!!! YOUR DESIGN IS LIKELY DEFICIENT.",
                  "\nSmall values in data_stan$cor_eigen",
