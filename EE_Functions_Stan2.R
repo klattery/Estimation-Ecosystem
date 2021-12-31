@@ -479,7 +479,7 @@ env_code$make_codefiles <- function(indcode_spec){
     if (min(check) <= 0) cat("Could not find initial x0 that satisfies constraints. \nSet indcode_list$x0 manually if using EB")
     result$x0 <- x0
   }
-
+  
   return(result)
 }
 
@@ -673,15 +673,12 @@ env_modfun$logpdf_mvt <- function(beta, alpha, cov_inv, df = 100) {
 }
 
 ###############  Stan Functions Environment ###############
-env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, check_collinearity = TRUE, other_data = NULL) {
-  result <- list(tag = 0, N = 0, P = 0, I = 0, T=0, dep = 0, ind = 0, sizes = 0,
-                 code_master = indcode_list$code_master, n_atts = nrow(indcode_list$code_blocks), code_blocks = indcode_list$code_blocks)
+env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, other_data = NULL) {
   sort_order <- order(idtaskdep[, 1], idtaskdep[, 2])
   sort_order[!train] <- 0 # Non-training gets order = 0, which removes
-  result$ind <- as.matrix(indcode_list$indcode[sort_order,])
-  result$ind_coded <- as.matrix(indcode_list$ind_coded[sort_order,])
-  result$ind_levels <- as.matrix(indcode_list$ind_levels[sort_order,])
-  result$sizes <- c(ncol(ind_coded), ncol(ind_levels), nrow(indcode_list$code_master))
+  ind <- as.matrix(indcode_list$indcode[sort_order,])
+  ind_coded <- as.matrix(indcode_list$ind_coded[sort_order,])
+  ind_levels <- as.matrix(indcode_list$ind_levels[sort_order,])
   
   dep <- as.vector(as.matrix(idtaskdep[sort_order, 3]))
   idtask <- data.frame(idtaskdep[sort_order, 1:2])
@@ -694,17 +691,16 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, check
   depsum_match <- (depsum[idtask_r,]) # Map Sum to rows
   dep <- dep / depsum_match # sum of dep will add to 1
   # Recode NAs to 0
-  result$ind[is.na(result$ind)] <- 0
+  ind[is.na(ind)] <- 0
   dep[is.na(dep)] <- 0
-  result$dep <- dep
-
+  wts <- rep(1, length(dep)) # initial weights are 1
+  
   # Add Stan stuff
-  result$end <- c(which(diff(idtask_r)!=0), length(idtask_r))
-  result$start <- c(1, end[-length(end)]+1)
-  result$task_individual <- match_id[result$start]
+  end <- c(which(diff(idtask_r)!=0), length(idtask_r))
+  start <- c(1, end[-length(end)]+1)
   if (!is.null(other_data)) {
-    result$other_data <- as.matrix(other_data)[sort_order,]
-  } else result$other_data <- 0
+    other_data <- as.matrix(other_data)[sort_order,]
+  } else other_data <- 0
   # Friendly output
   cat("Prepared data_stan with coded data and constraints\n")
   cat(paste0("    ",length(resp_id)), " Respondents\n")
@@ -715,23 +711,26 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, check
   print(rownames(indcode_list$code_master))
   
   # Check for collinearity
-  if (check_collinearity){
-    cat("\nChecking collinearity...")
-    result$cor_eigen <- eigen(coop::pcor(ind),only.values = TRUE, symmetric = TRUE)$values 
-    if (min(cor_eigen) < 1e-10){
-      cat(paste0("\n############################################",
-                 "\nWARNING!!!! YOUR DESIGN IS LIKELY DEFICIENT.",
-                 "\nSmall values in data_stan$cor_eigen",
-                 "\n############################################\n"))
-    } else{
-      cat(paste0("\nYour design is not deficient",
-                 "\nSmallest eigenvalue is: ", min(cor_eigen))) 
-    }
-  }  
+  ksvd <- svd(cor(ind))
+  if (min(ksvd$d) < 1e-10) cat(paste0("\n############################################",
+                                      "\nWARNING!!!! YOUR DESIGN IS LIKELY DEFICIENT.",
+                                      "\nSmall values in data_stan$cor_eigenvalues",
+                                      "\n############################################\n"))
   
-  return(modifyList(result, list(
+  return(list(tag = 0, N = nrow(ind), P = ncol(ind), T = max(idtask_r), I = length(resp_id),
+              dep = dep, ind = ind, idtask = idtask, idtask_r = idtask_r, resp_id = resp_id, match_id = match_id,
+              ind_coded = ind_coded,
+              ind_levels = ind_levels,
+              code_master = indcode_list$code_master,
+              sizes = c(ncol(ind_coded), ncol(ind_levels), nrow(indcode_list$code_master)),
+              code_blocks = indcode_list$code_blocks,
+              n_atts = nrow(indcode_list$code_blocks), 
+              task_individual = match_id[start],
+              start = start,
+              end = end,
               con_sign = indcode_list$con_sign,
               prior_cov = indcode_list$indprior,
+              code_master = indcode_list$code_master,
               paircon_rows = nrow(indcode_list$con_matrix),
               paircon_matrix = indcode_list$con_matrix,
               df = 2,
@@ -741,11 +740,10 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, check
               prior_cov_scale = 1,
               P_cov = 0,
               i_cov = matrix(0, length(resp_id), 0),
-              wts = rep(1, length(result$dep)),
+              wts = wts,
               x0 = indcode_list$x0,
-              idtask = idtask, idtask_r = idtask_r,
-              resp_id = resp_id, match_id = match_id,
-              other_data = other_data))) 
+              cor_eigenvalues = ksvd$d,
+              other_data = other_data)) 
 }  
 
 env_stan$message_estimation <- function(dir, stan_outname){
@@ -760,7 +758,7 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_wo
   nchains <- length(draws_beta$post_warmup_draws)
   nresp <- draws_beta$metadata$stan_variable_dims$beta_ind[2] # num respondents
   npar <- draws_beta$metadata$stan_variable_dims$beta_ind[1]
-
+  
   ### Save output files and check convergence ###
   draws_name <- paste0(out_prefix,"_draws_beta.rds")
   pdf_name <- paste0(out_prefix,"_trace_plots.pdf")
@@ -774,7 +772,7 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_wo
   
   hist(do.call(rbind,draws_beta$post_warmup_sampler_diagnostics)$accept_stat__, breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
   saveRDS(draws_beta, file.path(dir_work, draws_name)) # drop warmup
-
+  
   # Convergence charts saved as pdf and in fit_stats
   fit_stats <- data.frame(
     variable = vnames,
@@ -827,12 +825,12 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_wo
 env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_work){
   # Compute predictions 
   pred_all <- do.call(rbind, lapply(1:data_stan$T,
-                      function(t){
-                        U <- exp(data_stan$ind[data_stan$start[t]:data_stan$end[t],] %*%
-                                 utilities[data_stan$task_individual[t],])
-                        pred <- U/sum(U)
-                        return(pred)
-                      }
+                                    function(t){
+                                      U <- exp(data_stan$ind[data_stan$start[t]:data_stan$end[t],] %*%
+                                                 utilities[data_stan$task_individual[t],])
+                                      pred <- U/sum(U)
+                                      return(pred)
+                                    }
   )) # lapply, rbind
   utilities_r <- utilities %*% t(data_stan$code_master)
   util_name <- paste0(out_prefix,"_utilities_r.csv")
@@ -1514,5 +1512,4 @@ attach(env_code)
 attach(env_modfun)
 attach(env_eb)
 attach(env_stan)
-
 
