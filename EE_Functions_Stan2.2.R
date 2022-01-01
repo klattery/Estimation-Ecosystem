@@ -673,8 +673,10 @@ env_modfun$logpdf_mvt <- function(beta, alpha, cov_inv, df = 100) {
 }
 
 ###############  Stan Functions Environment ###############
-env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, check_collinearity = TRUE, other_data = NULL) {
-  result <- list(tag = 0, N = 0, P = 0, I = 0, T=0, dep = 0, ind = 0, sizes = 0,
+env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
+                                    data_cov, specs_cov_coding,
+                                    check_collinearity = FALSE, other_data = NULL) {
+  result <- list(tag = 0, N = 0, P = 0, I = 0, T = 0, dep = 0, ind = 0, sizes = 0,
                  code_master = indcode_list$code_master, n_atts = nrow(indcode_list$code_blocks), code_blocks = indcode_list$code_blocks)
   sort_order <- order(idtaskdep[, 1], idtaskdep[, 2])
   sort_order[!train] <- 0 # Non-training gets order = 0, which removes
@@ -697,6 +699,8 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, check
   result$ind[is.na(result$ind)] <- 0
   dep[is.na(dep)] <- 0
   result$dep <- dep
+  result$N <- nrow(result$ind); result$P <- ncol(result$ind);
+  result$I <- length(resp_id); result$T <- max(idtask_r); 
 
   # Add Stan stuff
   result$end <- c(which(diff(idtask_r)!=0), length(idtask_r))
@@ -714,6 +718,21 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, check
   cat(paste0("The final utilities will have ", nrow(indcode_list$code_master), " parameters:\n"))
   print(rownames(indcode_list$code_master))
   
+  # Covariates, weights
+  if (!is.null(data_cov)){ # Code respondent covariates and weights
+    if (nrow(specs_cov_coding) >0){
+      result$i_cov <- code_covariates(data_cov, specs_cov_coding, resp_id) 
+      result$P_cov <- ncol(result$i_cov) # Num of coded parameters
+    }
+    if (toupper(colnames(data_cov)[2]) %in% c("WTS","WT","WEIGHTS","WEIGHT")){
+      result$wts <- make_wts(data_cov, resp_id)[match_id]
+    } else cat("Optional weights variable not found in covariates data.  All data weighted at 1")
+  } else{
+    result$P_cov <- 0
+    result$i_cov <- matrix(0, length(resp_id), 0)
+    result$wts <- rep(1, length(result$dep))
+  }
+  
   # Check for collinearity
   if (check_collinearity){
     cat("\nChecking collinearity...")
@@ -725,24 +744,22 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE, check
                  "\n############################################\n"))
     } else{
       cat(paste0("\nYour design is not deficient",
-                 "\nSmallest eigenvalue is: ", min(cor_eigen))) 
+                 "\nSmallest eigenvalue is: ", min(result$cor_eigen))) 
     }
   }  
   
   return(modifyList(result, list(
               con_sign = indcode_list$con_sign,
-              prior_cov = indcode_list$indprior,
               paircon_rows = nrow(indcode_list$con_matrix),
               paircon_matrix = indcode_list$con_matrix,
               df = 2,
-              prior_alpha = rep(0, ncol(ind)),
+              prior_alpha = rep(0, ncol(result$ind)),
               a_sig = 10,
-              cov_block = matrix(1, ncol(ind), ncol(ind)),
+              prior_cov = indcode_list$indprior,
+              cov_block = matrix(1, ncol(result$ind), ncol(result$ind)),
               prior_cov_scale = 1,
-              P_cov = 0,
-              i_cov = matrix(0, length(resp_id), 0),
-              wts = rep(1, length(result$dep)),
               x0 = indcode_list$x0,
+              threads_rec = min(max(1,(detectCores() - 2)/2), round(.5 + data_stan$T/(1000)), 24),
               idtask = idtask, idtask_r = idtask_r,
               resp_id = resp_id, match_id = match_id,
               other_data = other_data))) 
@@ -977,7 +994,6 @@ env_eb$numder_2 <- function(x, pos, delta = .01){
 }
 
 env_eb$agg_solve <- function(data_list, model_list, fish_inf = FALSE) {
-  # score_n 300 default means compute 300 score stats
   model_env <- list2env(model_list, parent = emptyenv())
   ksolve <- constrOptim(theta = model_env$x0, f = model_env$func$min, grad = model_env$func$gr, ui = model_env$con[, -1], ci = model_env$con[, 1], mu = 1e-02, control = list(trace = 1, REPORT = 1),
                         method = "BFGS", outer.iterations = 100, outer.eps = 1e-05, hessian = fish_inf,
