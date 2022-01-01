@@ -759,7 +759,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
               cov_block = matrix(1, ncol(result$ind), ncol(result$ind)),
               prior_cov_scale = 1,
               x0 = indcode_list$x0,
-              threads_rec = min(max(1,(detectCores() - 2)/2), round(.5 + data_stan$T/(1000)), 24),
+              threads_rec = min(max(1,(detectCores() - 2)/2), round(.5 + result$T/(1000)), 24),
               idtask = idtask, idtask_r = idtask_r,
               resp_id = resp_id, match_id = match_id,
               other_data = other_data))) 
