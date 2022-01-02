@@ -516,7 +516,7 @@ env_code$make_wts <- function(cov_in, resp_id){
   wts <- cov_in[,2,drop = TRUE]
   result <- wts[match(resp_id, cov_in[,1])]
   if (sum(is.na(result)) > 0){
-    cat(paste0(sum(is.na(result)), " respondents in data_stan have no matching weights.  These weigts are set to 1"))
+    cat(paste0(sum(is.na(result)), " respondents in data_stan have no matching weights.  These weights are set to 1"))
   }
   result[is.na(result)] <- 1
   cat("Weights used from column 2 of covariates file:\n")
@@ -725,12 +725,12 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
       result$P_cov <- ncol(result$i_cov) # Num of coded parameters
     }
     if (toupper(colnames(data_cov)[2]) %in% c("WTS","WT","WEIGHTS","WEIGHT")){
-      result$wts <- make_wts(data_cov, resp_id)[match_id]
+      result$wts <- make_wts(data_cov, resp_id)[result$task_individual]
     } else cat("Optional weights variable not found in covariates data.  All data weighted at 1")
   } else{
     result$P_cov <- 0
     result$i_cov <- matrix(0, length(resp_id), 0)
-    result$wts <- rep(1, length(result$dep))
+    result$wts <- rep(1, length(result$task_individual))
   }
   
   # Check for collinearity
@@ -903,7 +903,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
     con = as.matrix(con_matrix), # must be matrix, 
     x0 = x0 # starting point inside constraints - use overall mean
   )
-  
+
   id_eb <- function(idseq){
     end <- idseq * data_stan$P
     start <- end - data_stan$P + 1
@@ -920,7 +920,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
     id_list$idtask_r <- (match(data.frame(t(task_id)), data.frame(t(task_id_u)))) # unique tasks
     id_list$ind = data_stan$ind[id_filter,]
     id_list$dep <- as.matrix(data_stan$dep[id_filter]) # Need matrix
-    id_list$wts <- data_stan$wts[id_filter]
+    id_list$wts <- data_stan$wts[task_id]
     
     eb_solve <- constrOptim(theta = model_id$x0, f = model_id$func$min, grad = model_id$func$gr,
                             ui = model_id$con, ci = rep(0,nrow(model_id$con)), mu = 1e-02, control = list(),
