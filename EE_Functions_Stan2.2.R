@@ -841,7 +841,8 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_wo
 }
 
 env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_work){
-  # Compute predictions 
+  # Compute predictions
+  row_weights <- data_stan$wts[data_stan$idtask_r] # convert task weights to row weights
   pred_all <- do.call(rbind, lapply(1:data_stan$T,
                                     function(t){
                                       U <- exp(data_stan$ind[data_stan$start[t]:data_stan$end[t],] %*%
@@ -856,8 +857,8 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   failcon_name <- paste0(out_prefix,"_utilities_failcon.csv")
   
   
-  LL_id <- rowsum(log(pred_all) * data_stan$dep * data_stan$wts, data_stan$match_id)
-  sum_wts <- rowsum(data_stan$dep * data_stan$wts, data_stan$match_id)
+  LL_id <- rowsum(log(pred_all) * data_stan$dep * row_weights, data_stan$match_id)
+  sum_wts <- rowsum(data_stan$dep * row_weights, data_stan$match_id)
   sum_wts[sum_wts == 0] <- 1
   header <- cbind(id = data_stan$resp_id, rlh = exp(LL_id/sum_wts))
   colnames(header) <- c("id","rlh")
@@ -867,7 +868,7 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
     " Respondent mean utilities: ", util_name
   ))
   write.table(cbind(header, utilities_r), file = file.path(dir_work, util_name), sep = ",", na = ".", row.names = FALSE)
-  write.table(cbind(data_stan$idtask, dep = data_stan$dep, wts = data_stan$wts, pred = pred_all), file = file.path(dir_work, pred_name), sep = ",", na = ".", row.names = FALSE)
+  write.table(cbind(data_stan$idtask, dep = data_stan$dep, wts = row_weights, pred = pred_all), file = file.path(dir_work, pred_name), sep = ",", na = ".", row.names = FALSE)
   
   # Check if utilities meet constraints
   con_matrix <- diag(data_stan$con_sign)
