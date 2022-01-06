@@ -479,7 +479,7 @@ env_code$make_codefiles <- function(indcode_spec){
     if (min(check) <= 0) cat("Could not find initial x0 that satisfies constraints. \nSet indcode_list$x0 manually if using EB")
     result$x0 <- x0
   }
-
+  
   return(result)
 }
 
@@ -701,7 +701,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   result$dep <- dep
   result$N <- nrow(result$ind); result$P <- ncol(result$ind);
   result$I <- length(resp_id); result$T <- max(idtask_r); 
-
+  
   # Add Stan stuff
   result$end <- c(which(diff(idtask_r)!=0), length(idtask_r))
   result$start <- c(1, result$end[-length(result$end)]+1)
@@ -748,20 +748,20 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   }  
   
   return(modifyList(result, list(
-              con_sign = indcode_list$con_sign,
-              paircon_rows = nrow(indcode_list$con_matrix),
-              paircon_matrix = indcode_list$con_matrix,
-              df = 2,
-              prior_alpha = rep(0, ncol(result$ind)),
-              a_sig = 10,
-              prior_cov = indcode_list$indprior,
-              cov_block = matrix(1, ncol(result$ind), ncol(result$ind)),
-              prior_cov_scale = 1,
-              x0 = indcode_list$x0,
-              threads_rec = min(max(1,(detectCores() - 2)/2), round(.5 + result$T/(1000)), 24),
-              idtask = idtask, idtask_r = idtask_r,
-              resp_id = resp_id, match_id = match_id,
-              other_data = other_data))) 
+    con_sign = indcode_list$con_sign,
+    paircon_rows = nrow(indcode_list$con_matrix),
+    paircon_matrix = indcode_list$con_matrix,
+    df = 2,
+    prior_alpha = rep(0, ncol(result$ind)),
+    a_sig = 10,
+    prior_cov = indcode_list$indprior,
+    cov_block = matrix(1, ncol(result$ind), ncol(result$ind)),
+    prior_cov_scale = 1,
+    x0 = indcode_list$x0,
+    threads_rec = min(max(1,(detectCores() - 2)/2), round(.5 + result$T/(1000)), 24),
+    idtask = idtask, idtask_r = idtask_r,
+    resp_id = resp_id, match_id = match_id,
+    other_data = other_data))) 
 }  
 
 env_stan$message_estimation <- function(dir, stan_outname){
@@ -776,7 +776,7 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_wo
   nchains <- length(draws_beta$post_warmup_draws)
   nresp <- draws_beta$metadata$stan_variable_dims$beta_ind[2] # num respondents
   npar <- draws_beta$metadata$stan_variable_dims$beta_ind[1]
-
+  
   ### Save output files and check convergence ###
   draws_name <- paste0(out_prefix,"_draws_beta.rds")
   pdf_name <- paste0(out_prefix,"_trace_plots.pdf")
@@ -790,7 +790,7 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_wo
   
   hist(do.call(rbind,draws_beta$post_warmup_sampler_diagnostics)$accept_stat__, breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
   saveRDS(draws_beta, file.path(dir_work, draws_name)) # drop warmup
-
+  
   # Convergence charts saved as pdf and in fit_stats
   fit_stats <- data.frame(
     variable = vnames,
@@ -841,14 +841,15 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_wo
 }
 
 env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_work){
-  # Compute predictions 
+  # Compute predictions
+  row_weights <- data_stan$wts[data_stan$idtask_r] # convert task weights to row weights
   pred_all <- do.call(rbind, lapply(1:data_stan$T,
-                      function(t){
-                        U <- exp(data_stan$ind[data_stan$start[t]:data_stan$end[t],] %*%
-                                 utilities[data_stan$task_individual[t],])
-                        pred <- U/sum(U)
-                        return(pred)
-                      }
+                                    function(t){
+                                      U <- exp(data_stan$ind[data_stan$start[t]:data_stan$end[t],] %*%
+                                                 utilities[data_stan$task_individual[t],])
+                                      pred <- U/sum(U)
+                                      return(pred)
+                                    }
   )) # lapply, rbind
   utilities_r <- utilities %*% t(data_stan$code_master)
   util_name <- paste0(out_prefix,"_utilities_r.csv")
@@ -856,8 +857,8 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   failcon_name <- paste0(out_prefix,"_utilities_failcon.csv")
   
   
-  LL_id <- rowsum(log(pred_all) * data_stan$dep * data_stan$wts, data_stan$match_id)
-  sum_wts <- rowsum(data_stan$dep * data_stan$wts, data_stan$match_id)
+  LL_id <- rowsum(log(pred_all) * data_stan$dep * row_weights, data_stan$match_id)
+  sum_wts <- rowsum(data_stan$dep * row_weights, data_stan$match_id)
   sum_wts[sum_wts == 0] <- 1
   header <- cbind(id = data_stan$resp_id, rlh = exp(LL_id/sum_wts))
   colnames(header) <- c("id","rlh")
@@ -867,7 +868,7 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
     " Respondent mean utilities: ", util_name
   ))
   write.table(cbind(header, utilities_r), file = file.path(dir_work, util_name), sep = ",", na = ".", row.names = FALSE)
-  write.table(cbind(data_stan$idtask, dep = data_stan$dep, wts = data_stan$wts, pred = pred_all), file = file.path(dir_work, pred_name), sep = ",", na = ".", row.names = FALSE)
+  write.table(cbind(data_stan$idtask, dep = data_stan$dep, wts = row_weights, pred = pred_all), file = file.path(dir_work, pred_name), sep = ",", na = ".", row.names = FALSE)
   
   # Check if utilities meet constraints
   con_matrix <- diag(data_stan$con_sign)
@@ -914,7 +915,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
     con = as.matrix(con_matrix), # must be matrix, 
     x0 = x0 # starting point inside constraints - use overall mean
   )
-
+  
   id_eb <- function(idseq){
     end <- idseq * data_stan$P
     start <- end - data_stan$P + 1
