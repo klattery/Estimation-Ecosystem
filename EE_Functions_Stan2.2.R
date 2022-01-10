@@ -772,6 +772,48 @@ env_stan$message_estimation <- function(dir, stan_outname){
                  "tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > stan_part.csv"))
 }
 
+env_stan$plot_draws_df <- function(draws, vnames = NULL, ylab = "Draw", pdf_path = NULL,
+                                   chain_colors = rep(c("red","blue","green","black"),2)){
+  # Assume draws is a list of data frames
+  # Each data frame is draws for one chain of results with rows for iterations 
+  # We plot each column
+  if (is.null(vnames)) vnames <- colnames(draws[[1]]) # take names from first data frame
+  fit_stats <- data.frame(
+    variable = vnames,
+    mean = NA,
+    sd =  NA,
+    rhat = NA,
+    ESS = NA
+  )
+  if (!is.null(pdf_path)){
+    pdf(file = pdf_path,   # The directory you want to save the file in
+        width = 7, # The width of the plot in inches
+        height = 5) # The height of the plot in inches
+  }
+  for (i in 1:ncol(draws[[1]])){
+    x <- sapply(1:length(draws), function(chain){
+      draws[[chain]][,i]     
+    })
+    fit_stats$mean[i] <- round(mean(x), 2)
+    fit_stats$sd[i] <- round(sd(x),2)
+    fit_stats$rhat[i] <- round(rhat(x),2)
+    fit_stats$ESS[i] <- round(ess_basic(x),1)
+    plot(x[,1], type = "l", col = chain_colors[1], ylim = c(min(x), max(x)),
+         xlab = "Sample Iteration", ylab = "Draw",
+         main = paste(vnames[i],
+                      "| rhat = ", round(rhat(x),2),
+                      "| ESS = ", round(ess_basic(x),1)
+         ))
+    if (ncol(x) > 1){
+      for (chain in 2:ncol(x)){
+        lines(x[,chain], type = "l", col = chain_colors[chain])
+      }
+    }
+  } # end for
+  if (!is.null(pdf_path)) dev.off()
+  return(fit_stats)
+}
+
 env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_work){
   nchains <- length(draws_beta$post_warmup_draws)
   nresp <- draws_beta$metadata$stan_variable_dims$beta_ind[2] # num respondents
@@ -791,16 +833,9 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_wo
   hist(do.call(rbind,draws_beta$post_warmup_sampler_diagnostics)$accept_stat__, breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
   saveRDS(draws_beta, file.path(dir_work, draws_name)) # drop warmup
   
-  # Convergence charts saved as pdf and in fit_stats
-  fit_stats <- data.frame(
-    variable = vnames,
-    mean = NA,
-    sd =  NA,
-    rhat = NA,
-    ESS = NA
-  )
+  # Get mean of respondent betas for each iteration (like alpha in constrained space)
   ndraws <- nrow(draws_beta$post_warmup_draws[[1]])
-  draws_beta_mu <- list() # Creates the mean of respondent utilities for each iteration, like alpha
+  draws_beta_mu <- list() 
   for (chain_i in (1:nchains)){
     draws_beta_list <- as.matrix(draws_beta$post_warmup_draws[[chain_i]])
     draws_beta_mu[[chain_i]] <- t(sapply(1:ndraws, function(draw){
@@ -809,6 +844,7 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_wo
     }))
   } 
   
+  # Create pdf of acceptance rate + traceplots 
   pdf(file = file.path(dir_work, pdf_name),   # The directory you want to save the file in
       width = 7, # The width of the plot in inches
       height = 5) # The height of the plot in inches
@@ -816,26 +852,8 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_wo
   for (chain_i in (1:nchains)){
     matplot(1:nrow(draws_beta_mu[[chain_i]]), draws_beta_mu[[chain_i]],
             type = "l" , lty = 1, lwd = 1, main = paste0("Chain ", chain_i), xlab = "Iteration", ylab = "Mean Beta")   
-  }  
-  chain_cols <- c("red","blue","green","black")
-  for (i in 1:ncol(draws_beta_mu[[1]])){
-    x <- sapply(1:length(draws_beta_mu), function(chain){
-      draws_beta_mu[[chain]][,i]     
-    }) # x is set of column i across draws_beta_mu
-    fit_stats$mean[i] <- round(mean(x), 2)
-    fit_stats$sd[i] <- round(sd(x),2)
-    fit_stats$rhat[i] <- round(rhat(x),2)
-    fit_stats$ESS[i] <- round(ess_basic(x),1)
-    plot(x[,1], type = "l", col = chain_cols[1], ylim = c(min(x), max(x)),
-         xlab = "Sample Iteration", ylab = "Mean Beta",
-         main = paste(vnames[i],
-                      "| rhat = ", round(rhat(x),2),
-                      "| ESS = ", round(ess_basic(x),1)
-         ))
-    for (chain in 2:nchains){
-      lines(x[,2], type = "l", col = chain_cols[chain])
-    }
   }
+  fit_stats <- plot_draws_df(draws= draws_beta_mu, vnames = vnames, ylab = "Mean Beta") # Plots each column
   dev.off()
   write.table(fit_stats, file = file.path(dir_work, paste0(out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
 }
