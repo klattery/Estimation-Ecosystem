@@ -734,17 +734,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   
   # Check for collinearity
   if (check_collinearity){
-    cat("\nChecking collinearity...")
-    result$cor_eigen <- eigen(coop::pcor(result$ind),only.values = TRUE, symmetric = TRUE)$values 
-    if (min(result$cor_eigen) < 1e-10){
-      cat(paste0("\n############################################",
-                 "\nWARNING!!!! YOUR DESIGN IS LIKELY DEFICIENT.",
-                 "\nSmall values in data_stan$cor_eigen",
-                 "\n############################################\n"))
-    } else{
-      cat(paste0("\nYour design is not deficient",
-                 "\nSmallest eigenvalue is: ", min(result$cor_eigen))) 
-    }
+    result$collinear <- check_collinear(result$ind)
   }  
   
   return(modifyList(result, list(
@@ -763,6 +753,58 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
     resp_id = resp_id, match_id = match_id,
     other_data = other_data))) 
 }  
+
+env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
+  #add_int adds an intercept which we usually want
+  if(!is.matrix(x)) x <- as.matrix(x)
+  if (is.null(vnames)){
+    if (!is.null(colnames(x))){
+      vnames <- colnames(x)
+    } else vnames <- 1:ncol(x)
+  }
+  if (add_int){
+    x <- cbind(x,1)
+    vnames <- c(vnames, "intercept")
+  } 
+  mu <- colMeans(x)
+  qr_obj <- qr(x) #QR decomp
+  R <- qr.R(qr_obj) 
+  cov_qr <- crossprod(R)/(nrow(x)-1) - mu %*%t(mu) # covariance of data from QR
+  result <- list()
+  result$cor_eigen <- eigen(cov2cor(cov_qr))$value
+  rank <- qr_obj$rank
+  if (rank < ncol(x)){
+    # This code for bad_combos from R package findLinearCombos
+    pivot <- qr_obj$pivot              
+    p1 <- 1:rank
+    X <- R[p1, p1]                    # extract the independent columns
+    Y <- R[p1, -p1, drop = FALSE]     # extract the dependent columns
+    b <- qr(X)                        # factor the independent columns
+    b <- qr.coef(b, Y)                # get regression coefficients of dependent columns
+    b[abs(b) < 1e-6] <- 0             # zap small values
+    # generate a list with one element for each dependent column
+    bad_combos <- lapply(1:ncol(Y),
+                         function(i) vnames[c(pivot[rank + i], pivot[which(b[,i] != 0)])])
+    
+    cat(paste0("\n############################################",
+               "\nWARNING!!!! YOUR DESIGN IS DEFICIENT",
+               "\nThe following variables are perfectly collinear:",
+               paste("\n", bad_combos, collapse = ""),
+               "\n############################################\n"))
+    result$bad_combos <- bad_combos
+  } else {
+    if (min(result$cor_eigen) < 1e-10){
+      cat(paste0("\n############################################",
+                 "\nWARNING!!!! YOUR DESIGN MAY BE DEFICIENT.",
+                 "\nSmallest eigenvalue of correlation matrix is:", min(result$cor_eigen),
+                 "\n############################################\n"))
+    } else{
+      cat(paste0("\nYour design is not deficient",
+                 "\nSmallest eigenvalue is: ", min(result$cor_eigen))) 
+    }
+  }  
+  return(result)
+}
 
 env_stan$message_estimation <- function(dir, stan_outname){
   # For Linux terminal
