@@ -770,6 +770,10 @@ env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
   qr_obj <- qr(x) #QR decomp
   R <- qr.R(qr_obj) 
   cov_qr <- crossprod(R)/(nrow(x)-1) - mu %*%t(mu) # covariance of data from QR
+  if (add_int){
+    P <- ncol(cov_qr)
+    cov_qr <- cov_qr[-P,-P] # remove last row and column because they are intercept
+  } 
   result <- list()
   result$cor_eigen <- eigen(cov2cor(cov_qr))$value
   rank <- qr_obj$rank
