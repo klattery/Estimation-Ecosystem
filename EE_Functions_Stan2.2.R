@@ -788,7 +788,8 @@ env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
     b[abs(b) < 1e-6] <- 0             # zap small values
     # generate a list with one element for each dependent column
     bad_combos <- lapply(1:ncol(Y),
-                         function(i) vnames[c(pivot[rank + i], pivot[which(b[,i] != 0)])])
+                         function(i) vnames[sort(c(pivot[rank + i], pivot[which(b[,i] != 0)]))]
+                         )
     
     cat(paste0("\n############################################",
                "\nWARNING!!!! YOUR DESIGN IS DEFICIENT",
