@@ -1629,9 +1629,9 @@ env_shiny$ui_1 <- fluidPage(
       # Checkboxes
       checkboxInput("check_collinearity", "Check Collinearity", TRUE),
       checkboxInput("est_aggmodel", "Estimate Aggregate Model", TRUE),
+      textInput("out_prefix", "Text you want to prefix output", value = "MyOut", width = NULL, placeholder = NULL),
       tags$hr(),
       actionButton("setup_ready","Save Changes to R & Exit Upload", class = "btn-primary")
-      
     ),
     # Main panel for displaying outputs ----
     mainPanel(
@@ -1696,6 +1696,7 @@ env_shiny$server_1 <- function(input, output) {
   output$file3 <- renderTable({data3()[1:10,]})
   
   observeEvent(input$setup_ready, {
+    .GlobalEnv$out_prefix <- input$out_prefix
     if (!is.null(data1())) {.GlobalEnv$data_conjoint <- data1()}
     if (!is.null(data2())) {
       .GlobalEnv$specs_att_coding <- data2()$specs_att_coding
