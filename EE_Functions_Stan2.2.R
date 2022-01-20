@@ -98,10 +98,10 @@ env_code$catcode <- function(kdata, vname, codetype = 3, varout = NULL, reflev =
       colnames(code_matrix) <- varnames[-reflev]
     }  
     outcode <- (code_matrix[newval,TRUE,drop = FALSE])
-    if (is.null(paircon)){
-      con_vec <- rep(0, ncol(code_matrix))
-      pairs_add <- NULL
-    } 
+  } # end numlev >=2
+  if (is.null(paircon)){
+    con_vec <- rep(0, ncol(code_matrix))
+    pairs_add <- NULL
   }
   outcode[na_vals,] <- setna
   # Now get priors
