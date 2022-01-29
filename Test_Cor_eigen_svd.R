@@ -30,3 +30,5 @@ sessionInfo()
 sudo apt-get install libopenblas-base
 sudo update-alternatives --config libblas.so.3-aarch64-linux-gnu
 
+kevin <- 3.14
+
