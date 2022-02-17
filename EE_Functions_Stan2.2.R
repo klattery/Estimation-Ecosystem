@@ -260,7 +260,7 @@ env_code$usercode1 <- function(kdata, vname, varout = NULL, con_sign = 0){
   return(list(outcode = outcode, code_matrix = code_matrix, con_sign = con_sign, vnames = varout, prior = prior))
 }
 
-env_code$usercode <- function(kdata, kcol, varout = NULL){
+env_code$usercode <- function(kdata, kcol, varout = NULL, con_sign = 0){
   if (is.null(varout)){
     varout <- colnames(kdata)[kcol]
     if (is.null(varout)) varout <- "user_"
@@ -274,7 +274,7 @@ env_code$usercode <- function(kdata, kcol, varout = NULL){
     varout <- paste0("user_", 1:numcol)
   }
   colnames(outcode) <- varout
-  return(list(outcode = outcode, code_matrix = diag(ncol(outcode)), vnames = varout, prior = diag(ncol(outcode))))
+  return(list(outcode = outcode, code_matrix = diag(ncol(outcode)), con_sign = rep(con_sign,num_col), vnames = varout, prior = diag(ncol(outcode))))
 }
 
 env_code$ordmatrix <- function(num_levels) {
