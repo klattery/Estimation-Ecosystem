@@ -274,7 +274,7 @@ env_code$usercode <- function(kdata, kcol, varout = NULL, con_sign = 0){
     varout <- paste0("user_", 1:numcol)
   }
   colnames(outcode) <- varout
-  return(list(outcode = outcode, code_matrix = diag(ncol(outcode)), con_sign = rep(con_sign,num_col), vnames = varout, prior = diag(ncol(outcode))))
+  return(list(outcode = outcode, code_matrix = diag(ncol(outcode)), con_sign = rep(con_sign,numcol), vnames = varout, prior = diag(ncol(outcode))))
 }
 
 env_code$ordmatrix <- function(num_levels) {
