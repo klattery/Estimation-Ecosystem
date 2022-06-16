@@ -7,11 +7,11 @@
 
 # Create 3 Environments to Store Functions
 # Attaching an environment multiple times creates duplicates
-if (exists("env_code")) rm(env_code)
-if (exists("env_modfun")) rm(env_modfun)
-if (exists("env_eb")) rm(env_eb)
-if (exists("env_stan")) rm(env_stan)
-if (exists("env_shiny")) rm(env_shiny)
+if (exists("env_code")){detach(env_code); rm(env_code)} 
+if (exists("env_modfun")) {detach(env_modfun); rm(env_modfun)}
+if (exists("env_eb")) {detach(env_eb); rm(env_eb)}
+if (exists("env_stan")) {detach(env_stan); rm(env_stan)}
+if (exists("env_shiny")) {detach(env_shiny); rm(env_shiny)}
 env_code <- new.env(parent = emptyenv())
 env_modfun <- new.env(parent = emptyenv())
 env_eb <- new.env(parent = emptyenv())
