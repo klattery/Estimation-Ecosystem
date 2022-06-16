@@ -994,7 +994,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   id_eb <- function(idseq){
     end <- idseq * data_stan$P
     start <- end - data_stan$P + 1
-    resp_draws <- do.call(rbind, lapply(draws_beta$post_warmup_draws, function(x) x[,start:end]))
+    resp_draws <- do.call(rbind, lapply(draws_beta$post_warmup_draws, function(x) do.call(cbind, x[start:end])))
     model_id <- model_eb
     resp_mu <- colMeans(resp_draws)
     model_id$prior$alpha <- resp_mu
