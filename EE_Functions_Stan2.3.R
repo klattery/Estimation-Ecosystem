@@ -865,10 +865,12 @@ env_stan$plot_draws_df <- function(draws, vnames = NULL, ylab = "Draw", pdf_path
 
 env_stan$get_mean_beta <- function(draws_beta){
   nchains <- length(draws_beta$post_warmup_draws)
-  matrix(Reduce("+",lapply(draws_beta$post_warmup_draws, function(x) sapply(x, mean)))/nchains,
+  result <- matrix(
+    Reduce("+",lapply(draws_beta$post_warmup_draws, function(x) sapply(x, mean)))/nchains,
          draws_beta$metadata$stan_variable_sizes$beta_ind[2], # Respondents
          draws_beta$metadata$stan_variable_sizes$beta_ind[1], # Parameters
          byrow = TRUE) # First P entries are resp 1
+  return(result)
 }
 
 checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_work){
