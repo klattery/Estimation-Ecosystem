@@ -964,7 +964,7 @@ env_stan$est_agg_model <- function(data_list){
   )
   cat("Estimating aggregate MNL model for checking\n")
   agg_beta <- optim(par = model_agg$x0, fn = model_agg$func$min, gr = model_agg$func$gr, method ="BFGS",
-                    data_list = data_stan, model_env = model_agg, control = list(maxit = 100, reltol = 1e-5, trace = 1, REPORT = 1))
+                    data_list = data_list, model_env = model_agg, control = list(maxit = 100, reltol = 1e-5, trace = 1, REPORT = 1))
   return(agg_beta)
 }
 
