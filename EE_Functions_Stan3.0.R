@@ -1032,9 +1032,9 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
     predprob_mu <- model_id$func$pred(x = resp_mu, data_list = id_list)
     sum_wt <- sum(id_list$dep *id_list$wts)
     rlh <- exp(sum(log(predprob) * id_list$dep * id_list$wts)/sum_wt)
-    betas <- c(data_stan$resp_id[idseq], rlh, round(eb_solve$par, 6))
-    names(betas) <- c("id", "rlh_eb", colnames(data_stan$ind))
-    preds <- cbind(data_stan$idtask[id_filter,],id_list$dep, id_list$wts, predprob)
+    betas <- c(idseq, rlh, round(eb_solve$par, 6))
+    names(betas) <- c("idseq", "rlh_eb", colnames(data_stan$ind))
+    preds <- data.frame(data_stan$idtask[id_filter,],id_list$dep, id_list$wts, predprob)
     result <- list(betas, preds)
     return(result)
   }
@@ -1069,17 +1069,18 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
     betas_eb <- do.call(rbind, lapply(result, function(x) x[[1]]))
     preds <- do.call(rbind, lapply(result, function(x) x[[2]]))
   }
-  if (nrow(betas_eb) < data_stan$I) cat("Some respondents not estimated for EB") 
-  utilities_r_eb <- betas_eb[,-1:-2]  %*% t(data_stan$code_master) # id, rlh_eb
+  if (nrow(betas_eb) < data_stan$I) cat("Some respondents not estimated for EB")
+  header <- data.frame(betas_eb[,1:2])
+  header[,1] <- data_stan$idtask[header[,1],1] # convert idseq to id
+  utilities_r_eb <- as.matrix(betas_eb[,-1:-2])  %*% t(data_stan$code_master) # id, rlh_eb
   util_eb_name <- paste0(out_prefix,"_utilities_r_eb.csv")
-  write.table(cbind(betas_eb[,1:2], utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
+  write.table(cbind(header, utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
   message(paste0("\nEB point estimates in:      ",util_eb_name))
   colnames(preds) <- c("id","task","dep","wts","pred_eb")
   preds_name <- paste0(out_prefix,"_preds_EB.csv")
   write.table(preds, file = file.path(dir_work, preds_name), sep = ",", na = ".", row.names = FALSE)  
   message(paste0("EB predictions for data in: ", preds_name))
 }
-
 
 env_eb$numder_2 <- function(x, pos, delta = .01){
   # 2nd derivative
