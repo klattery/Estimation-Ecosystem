@@ -746,8 +746,8 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
     result <- sum(log(1+exp(-100 * (con_matrix %*% x))))
     return(result)
   }
-  x_initial <- optim(par = rep(0, result$P), fn = fcon,
-                     lower = -.5, upper = .5, method = "BFGS", control = list(maxit = 20),
+  x_initial <- optim(par = rep(0, ncol(indcode_list$code_master)), fn = fcon,
+                     lower = -.5, upper = .5, method = "L-BFGS-B", control = list(maxit = 20),
                      con_matrix = con_matrix)
   check_con <- min(con_matrix %*% x_initial)
   if (check_con < 0) message("Please check constraints. Could not find initial value that satisfied your constraints. HB estimation can run, but Empirical Bayes cannot.")
