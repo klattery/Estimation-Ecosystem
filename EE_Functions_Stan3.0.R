@@ -704,7 +704,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   result$N <- nrow(result$ind); result$P <- ncol(result$ind);
   result$I <- length(resp_id); result$T <- max(idtask_r); 
   
-  # Add Stan stuff
+  # Add Stan ragged array stuff
   result$end <- c(which(diff(idtask_r)!=0), length(idtask_r))
   result$start <- c(1, result$end[-length(result$end)]+1)
   result$task_individual <- match_id[result$start]
