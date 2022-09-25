@@ -949,8 +949,7 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   LL_id <- rowsum(log(pred_all) * data_stan$dep * row_weights, data_stan$match_id)
   sum_wts <- rowsum(data_stan$dep * row_weights, data_stan$match_id)
   sum_wts[sum_wts == 0] <- 1
-  header <- cbind(id = data_stan$resp_id, rlh = exp(LL_id/sum_wts))
-  colnames(header) <- c("id","rlh")
+  header <- data.frame(id = data_stan$resp_id, rlh = exp(LL_id/sum_wts))
   message(paste0(
     "Saving: \n",
     " Predictions for data     : ", pred_name, "\n",
