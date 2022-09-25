@@ -743,7 +743,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   con_matrix <- diag(indcode_list$con_sign)
   con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], indcode_list$con_matrix)
   fcon <- function(x, con_matrix){
-    result <- -sum(log(1+exp(-100 * (con_matrix * x))))
+    result <- sum(log(1+exp(-100 * (con_matrix %*% x))))
     return(result)
   }
   x_initial <- optim(par = rep(0, result$P), fn = fcon,
