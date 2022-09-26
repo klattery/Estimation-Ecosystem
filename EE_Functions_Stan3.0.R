@@ -346,15 +346,15 @@ env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
   result <- TRUE
   check_att <- att_coding[,1,drop = TRUE] %in% colnames(data_in)
   if (min(check_att) == 0){
-    message("You specified attributes that are not in your data.  Please fix.")
-    att_coding[!check_att,1]
+    cat("Below are attributes specified that are not in your data.  Please fix.\n")
+    print(att_coding[!check_att,1])
     result <- FALSE
   }
   if (nrow(constraints) > 0){
     check_match <- constraints[,1, drop = TRUE] %in% att_coding[,1, drop = TRUE]
     if (min(check_match) == 0){
-      message("You specified constraints that do no match any attribute in attribute file.  Please fix.")
-      constraints[!check_match,1]
+      cat("You specified constraints that do no match any attribute in attribute file.  Please fix.")
+      print(constraints[!check_match,1])
       result <- FALSE
     }
   }
@@ -387,7 +387,7 @@ env_code$indcode_spec_files <- function(data_in, att_coding, constraints){
       }
     }  
     indcode_spec <- setNames(indcode_spec,att_coding[,1,drop = TRUE])
-  } else indcode_spec <- "Error: Data file, attributes, constraints do not match" 
+  } else indcode_spec <- NULL 
   return(indcode_spec)
 }
 
