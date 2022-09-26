@@ -1073,7 +1073,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   }
   if (nrow(betas_eb) < data_stan$I) cat("Some respondents not estimated for EB")
   header <- data.frame(betas_eb[,1:2])
-  header[,1] <- data_stan$resp_id[header[,1],1] # convert idseq to id
+  header[,1] <- data_stan$resp_id[header[,1]] # convert idseq to id
   utilities_r_eb <- as.matrix(betas_eb[,-1:-2])  %*% t(data_stan$code_master) # id, rlh_eb
   util_eb_name <- paste0(out_prefix,"_utilities_r_eb.csv")
   write.table(cbind(header, utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
