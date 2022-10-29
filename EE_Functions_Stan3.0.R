@@ -677,7 +677,8 @@ env_modfun$logpdf_mvt <- function(beta, alpha, cov_inv, df = 100) {
 ###############  Stan Functions Environment ###############
 env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
                                     data_cov, specs_cov_coding,
-                                    check_collinearity = FALSE, other_data = NULL) {
+                                    check_collinearity = FALSE, other_data = NULL,
+                                    force_sumtask_dep1 = TRUE) {
   result <- list(tag = 0, N = 0, P = 0, I = 0, T = 0, dep = 0, ind = 0, sizes = 0,
                  code_master = indcode_list$code_master, n_atts = nrow(indcode_list$code_blocks), code_blocks = indcode_list$code_blocks)
   sort_order <- order(idtaskdep[, 1], idtaskdep[, 2])
@@ -694,9 +695,11 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   resp_id <- as.vector(unique(idtask_u[, 1]))
   match_id <- match(idtask[, 1], as.matrix(resp_id))
   # Next 3 lines recodes dep to sum to 1
-  depsum <- rowsum(dep, idtask_r) # Sum dep each task
-  depsum_match <- (depsum[idtask_r,]) # Map Sum to rows
-  dep <- dep / depsum_match # sum of dep will add to 1
+  if (force_sumtask_dep1){
+    depsum <- rowsum(dep, idtask_r) # Sum dep each task
+    depsum_match <- (depsum[idtask_r,]) # Map Sum to rows
+    dep <- dep / depsum_match # sum of dep will add to 1
+  }
   # Recode NAs to 0
   result$ind[is.na(result$ind)] <- 0
   dep[is.na(dep)] <- 0
