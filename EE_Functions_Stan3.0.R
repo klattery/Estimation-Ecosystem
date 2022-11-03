@@ -978,7 +978,7 @@ env_stan$est_agg_model <- function(data_list){
   data_list$wts <- data_list$wts[data_list$idtask_r] # Convert task weights to row weights
   model_agg <- list(
     func = list(pred = PredMNL, min = LL_Neg, gr = grad_MNL),
-    x0 =  rep(0, data_stan$P) # start at 0
+    x0 =  rep(0, data_list$P) # start at 0
   )
   cat("Estimating aggregate MNL model for checking\n")
   agg_beta <- optim(par = model_agg$x0, fn = model_agg$func$min, gr = model_agg$func$gr, method ="BFGS",
