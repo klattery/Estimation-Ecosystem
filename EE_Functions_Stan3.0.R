@@ -719,10 +719,14 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   cat(paste0("    ",length(resp_id)), " Respondents\n")
   cat(paste0("    ",sprintf("%.1f",max(idtask_r)/length(resp_id)),
              " Tasks per Respondent\n"))
-  cat(paste0("    ", ncol(indcode_list$code_master)), " coded parameters\n")  
+  khead <- data.frame("   # Concepts in Tasks:  " = "   ", check.names=FALSE)
+  t_table <- as.data.frame(table(result$end - result$start + 1, dnn = "N_Concepts"),
+                           responseName = "N_Tasks")
+  print(cbind(khead, t_table), row.names = F)
+  cat(paste0("There are ", ncol(indcode_list$code_master)), " coded parameters\n")  
   cat(paste0("The final utilities will have ", nrow(indcode_list$code_master), " parameters:\n"))
   print(rownames(indcode_list$code_master))
-  
+
   # Covariates, weights
   result$P_cov <- 0
   result$i_cov <- matrix(0, length(resp_id), 0)
