@@ -511,6 +511,10 @@ env_code$code_covariates <- function(cov_in, cov_coding, resp_id){
   cov_code_spec <- indcode_spec_files(cov_in, cov_coding, NULL)
   cov_code <- do.call(cbind, lapply(cov_code_spec[sapply(cov_code_spec, length) > 0],
                                     function(x) x$outcode)) # coded variables
+  code_master <- list_to_matrix(lapply(cov_code_spec, function(x) x$code_matrix))
+  colnames(code_master) <- colnames(cov_code) 
+  rownames(code_master) <- do.call("c", lapply(cov_code_spec, function(x) x$vnames))
+  
   row_match <- match(resp_id, cov_in[,1])
   no_cov <- is.na(row_match) # Respondents in data with no matching covariate
   row_match[is.na(row_match)] <- 1
@@ -519,7 +523,7 @@ env_code$code_covariates <- function(cov_in, cov_coding, resp_id){
     message(paste0(sum(no_cov), " respondents had no covariates.  Coded to 0"))
     result[no_cov,] <- 0 # set bad to 0
   } else message(paste0("All respondents matched in covariates file.  ", ncol(result), " coded parameters"))
-  return(list(output = result, cov_code = cov_code))
+  return(list(output = result, cov_code_master = code_master))
 }
 
 env_code$make_wts <- function(cov_in, resp_id){
@@ -745,7 +749,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
       covariates_out <- code_covariates(data_cov, specs_cov_coding, resp_id)
       result$i_cov <- covariates_out$output 
       result$P_cov <- ncol(result$i_cov) # Num of coded parameters
-      result$covariates_code <- covariates_out$cov_code
+      result$covariates_code <- covariates_out$cov_code_master
     }
     if (toupper(colnames(data_cov)[2]) %in% c("WTS","WT","WEIGHTS","WEIGHT")){
       result$wts <- make_wts(data_cov, resp_id)[result$task_individual]
