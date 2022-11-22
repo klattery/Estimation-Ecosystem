@@ -24,6 +24,7 @@ env_shiny$ui_1 <- fluidPage(
                   accept = c(".csv",".rds"))),
       tags$hr(),
       # Checkboxes
+      checkboxInput("add_none", "Add None Variable when All Attributes are 0", TRUE),
       checkboxInput("check_collinearity", "Check Collinearity", TRUE),
       checkboxInput("est_aggmodel", "Estimate Aggregate Model", TRUE),
       textInput("out_prefix", "Text you want to prefix output", value = "MyOut", width = NULL, placeholder = NULL),
@@ -103,6 +104,7 @@ env_shiny$server_1 <- function(input, output) {
     if (input$use_cov){
       .GlobalEnv$data_cov <- data3()
     } else .GlobalEnv$data_cov <- NULL
+    .GlobalEnv$add_none <- input$add_none # To be like Sawtooth
     .GlobalEnv$check_collinearity <- input$check_collinearity # May take a few minutes to check if your coding is deficient
     .GlobalEnv$est_aggmodel <- input$est_aggmodel # Option to estimate aggregate model
     stopApp()
