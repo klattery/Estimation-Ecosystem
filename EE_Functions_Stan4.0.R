@@ -916,7 +916,7 @@ env_stan$get_covariates <- function(HB_fit, data_stan){
       byrow = TRUE) # First P entries are Covariate level 1
     result <- data_stan$code_master %*% t(result) # Back code parameters
     colnames(result) <- colnames(data_stan$i_cov)
-    write.table(result, file = file.path(dir_work, paste0(out_prefix,"_covariates.csv")), sep = ",", na = ".", row.names = FALSE)
+    write.table(result, file = file.path(dir$work, paste0(out_prefix,"_covariates.csv")), sep = ",", na = ".", row.names = FALSE)
     return(result)
 }
 
