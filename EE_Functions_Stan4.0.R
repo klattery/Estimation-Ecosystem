@@ -508,7 +508,7 @@ env_code$code_covariates <- function(cov_in, cov_coding, resp_id){
     message(paste0(sum(no_cov), " respondents had no covariates.  Coded to 0"))
     result[no_cov,] <- 0 # set bad to 0
   } else message(paste0("All respondents matched in covariates file.  ", ncol(result), " coded parameters"))
-  return(result)
+  return(list(output = result, cov_code = cov_code))
 }
 
 env_code$make_wts <- function(cov_in, resp_id){
@@ -731,8 +731,10 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   result$wts <- rep(1, length(result$task_individual))
   if (!is.null(data_cov)){ # Code respondent covariates and weights
     if (nrow(specs_cov_coding) >0){
-      result$i_cov <- code_covariates(data_cov, specs_cov_coding, resp_id) 
+      covariates_out <- code_covariates(data_cov, specs_cov_coding, resp_id)
+      result$i_cov <- covariates_out$output 
       result$P_cov <- ncol(result$i_cov) # Num of coded parameters
+      result$covariates_code <- covariates_out$cov_code
     }
     if (toupper(colnames(data_cov)[2]) %in% c("WTS","WT","WEIGHTS","WEIGHT")){
       result$wts <- make_wts(data_cov, resp_id)[result$task_individual]
@@ -894,7 +896,21 @@ env_stan$get_mean_beta <- function(draws_beta){
   return(result)
 }
 
-checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_work){
+env_stan$get_covariates <- function(HB_fit, data_stan){
+    draws_i_cov_load <- read_cmdstan_csv(HB_fit$output_files(), variables = "i_cov_load", format = "draws_list")
+    nchains <- length(draws_i_cov_load$post_warmup_draws)
+    result <- matrix(
+      Reduce("+",lapply(draws_i_cov_load$post_warmup_draws, function(x) sapply(x, mean)))/nchains,
+      draws_i_cov_load$metadata$stan_variable_sizes$i_cov_load[2], # Covariates
+      draws_i_cov_load$metadata$stan_variable_sizes$i_cov_load[1], # Parameters
+      byrow = TRUE) # First P entries are Covariate level 1
+    result <- data_stan$code_master %*% t(result) # Back code parameters
+    colnames(result) <- colnames(data_stan$i_cov)
+    write.table(result, file = file.path(dir_work, paste0(out_prefix,"_covariates.csv")), sep = ",", na = ".", row.names = FALSE)
+    return(result)
+}
+
+env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_work){
   nchains <- length(draws_beta$post_warmup_draws)
   nresp <- draws_beta$metadata$stan_variable_sizes$beta_ind[2] # num respondents
   npar <- draws_beta$metadata$stan_variable_sizes$beta_ind[1]
@@ -951,8 +967,7 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   util_name <- paste0(out_prefix,"_utilities_r.csv")
   pred_name <- paste0(out_prefix,"_preds_meanpt.csv")
   failcon_name <- paste0(out_prefix,"_utilities_failcon.csv")
-  
-  
+
   LL_id <- rowsum(log(pred_all) * data_stan$dep * row_weights, data_stan$match_id)
   sum_wts <- rowsum(data_stan$dep * row_weights, data_stan$match_id)
   sum_wts[sum_wts == 0] <- 1
