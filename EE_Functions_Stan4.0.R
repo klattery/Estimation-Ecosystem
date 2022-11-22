@@ -840,7 +840,7 @@ env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
                  "\nSmallest eigenvalue of correlation matrix is:", min(result$cor_eigen),
                  "\n############################################\n"))
     } else{
-      cat(paste0("\nYour design is not deficient. Smallest eigenvalue is:", min(result$cor_eigen))) 
+      cat(paste0("\nYour design is not deficient. Smallest eigenvalue is: ", min(result$cor_eigen))) 
     }
   }  
   return(result)
