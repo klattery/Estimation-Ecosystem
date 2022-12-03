@@ -923,7 +923,6 @@ env_stan$get_covariates <- function(HB_fit, data_stan){
     draws_i_cov_load$metadata$stan_variable_sizes$i_cov_load[1], # Parameters
     byrow = TRUE) # First P entries are Covariate level 1
   result <- (data_stan$code_master %*% t(result)) %*% t(data_stan$covariates_code) # Back code parameters
-  result <-  cbind(parameters = rownames(result), data.frame(result))
   write.table(result, file = file.path(dir$work, paste0(out_prefix,"_covariates.csv")), sep = ",", na = ".", row.names = TRUE)
   return(result)
 }
@@ -970,26 +969,6 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_wo
   write.table(fit_stats, file = file.path(dir_work, paste0(out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
 }
 
-env_stan$obs_vs_pred <- function(wts_obs_pred, cat_vars, predvar_out = "pred_per"){
-  ind_levels <- as.data.frame(cat_vars) # in case cat_vars is a vector
-  obs_vs_pred <- do.call(rbind, lapply(1:ncol(ind_levels), function(i){
-    ksplit <- split(wts_obs_pred, ind_levels[,i], drop = TRUE)
-    result <- do.call(rbind,lapply(ksplit, function(x) {
-      base <- sum(x[,1])
-      return(c(base, sum(x[,2]), sum(x[,1] * x[,2])/base, sum(x[,1] * x[,3])/base))
-    }))
-    result_df <- data.frame(cat_var= colnames(ind_levels)[i],
-                            level = as.numeric(rownames(result)),
-                            shows = result[,1],
-                            chosen = result[,2],
-                            obs_per = result[,3],
-                            pred_per = result[,4])
-    return(result_df)
-  }))
-  
-  return(obs_vs_pred)
-}
-
 env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_work){
   # Compute predictions
   row_weights <- data_stan$wts[data_stan$idtask_r] # convert task weights to row weights
@@ -1005,7 +984,6 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   util_name <- paste0(out_prefix,"_utilities_r.csv")
   pred_name <- paste0(out_prefix,"_preds_meanpt.csv")
   failcon_name <- paste0(out_prefix,"_utilities_failcon.csv")
-  obs_vs_pred_name <- paste0(out_prefix,"_obs_vs_pred.csv")
   
   LL_id <- rowsum(log(pred_all) * data_stan$dep * row_weights, data_stan$match_id)
   sum_wts <- rowsum(data_stan$dep * row_weights, data_stan$match_id)
@@ -1013,17 +991,11 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   header <- data.frame(id = data_stan$resp_id, rlh = exp(LL_id/sum_wts))
   message(paste0(
     "Saving: \n",
-    " Respondent mean utilities: ", util_name, "\n",
     " Predictions for data     : ", pred_name, "\n",
-    " Observed vs Predicted    : ", obs_vs_pred_name 
+    " Respondent mean utilities: ", util_name
   ))
-  
-  pred_all_export <- cbind(data_stan$idtask, wts = row_weights, dep = data_stan$dep, pred = pred_all)
-  obs_vs_pred <- obs_vs_pred(pred_all_export[,3:5], data_stan$ind_levels)
-  
   write.table(cbind(header, utilities_r), file = file.path(dir_work, util_name), sep = ",", na = ".", row.names = FALSE)
-  write.table(pred_all_export, file = file.path(dir_work, pred_name), sep = ",", na = ".", row.names = FALSE)
-  write.table(obs_vs_pred, file = file.path(dir_work, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
+  write.table(cbind(data_stan$idtask, dep = data_stan$dep, wts = row_weights, pred = pred_all), file = file.path(dir_work, pred_name), sep = ",", na = ".", row.names = FALSE)
   
   # Check if utilities meet constraints
   con_matrix <- diag(data_stan$con_sign)
@@ -1101,7 +1073,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
     rlh <- exp(sum(log(predprob) * id_list$dep * id_list$wts)/sum_wt)
     betas <- c(idseq, rlh, round(eb_solve$par, 6))
     names(betas) <- c("idseq", "rlh_eb", colnames(data_stan$ind))
-    preds <- data.frame(data_stan$idtask[id_filter,], id_list$wts, id_list$dep, predprob)
+    preds <- data.frame(data_stan$idtask[id_filter,],id_list$dep, id_list$wts, predprob)
     result <- list(betas, preds)
     return(result)
   }
@@ -1143,15 +1115,10 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   util_eb_name <- paste0(out_prefix,"_utilities_r_eb.csv")
   write.table(cbind(header, utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
   message(paste0("\nEB point estimates in:      ",util_eb_name))
-  colnames(preds) <- c("id","task","wts", "dep","pred_eb")
+  colnames(preds) <- c("id","task","dep","wts","pred_eb")
   preds_name <- paste0(out_prefix,"_preds_EB.csv")
   write.table(preds, file = file.path(dir_work, preds_name), sep = ",", na = ".", row.names = FALSE)  
   message(paste0("EB predictions for data in: ", preds_name))
-  
-  obs_vs_pred <- obs_vs_pred(preds[,3:5], data_stan$ind_levels)
-  obs_vs_pred_name <- paste0(out_prefix,"_obs_vs_pred_EB.csv")
-  write.table(obs_vs_pred, file = file.path(dir_work, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
-  message(paste0("Observed vs Predicted EB in: ", obs_vs_pred_name))  
 }
 
 env_eb$numder_2 <- function(x, pos, delta = .01){
@@ -1704,5 +1671,7 @@ attach(env_code)
 attach(env_modfun)
 attach(env_eb)
 attach(env_stan)
+
+
 
 
