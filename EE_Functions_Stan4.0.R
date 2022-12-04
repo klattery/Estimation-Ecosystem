@@ -1142,7 +1142,7 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   utilities_r_eb <- as.matrix(betas_eb[,-1:-2])  %*% t(data_stan$code_master) # id, rlh_eb
   util_eb_name <- paste0(out_prefix,"_utilities_r_eb.csv")
   write.table(cbind(header, utilities_r_eb), file = file.path(dir_work, util_eb_name), sep = ",", na = ".", row.names = FALSE)
-  message(paste0("\nEB point estimates      :      ",util_eb_name))
+  message(paste0("\nEB point estimates      : ",util_eb_name))
   colnames(preds) <- c("id","task","wts", "dep","pred_eb")
   preds_name <- paste0(out_prefix,"_preds_EB.csv")
   write.table(preds, file = file.path(dir_work, preds_name), sep = ",", na = ".", row.names = FALSE)  
