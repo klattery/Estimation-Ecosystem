@@ -1146,12 +1146,12 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   colnames(preds) <- c("id","task","wts", "dep","pred_eb")
   preds_name <- paste0(out_prefix,"_preds_EB.csv")
   write.table(preds, file = file.path(dir_work, preds_name), sep = ",", na = ".", row.names = FALSE)  
-  message(paste0("EB predictions for data  : ", preds_name))
+  message(paste0("EB predictions for data : ", preds_name))
   
   obs_vs_pred <- obs_vs_pred(preds[,3:5], data_stan$ind_levels)
   obs_vs_pred_name <- paste0(out_prefix,"_obs_vs_pred_EB.csv")
   write.table(obs_vs_pred, file = file.path(dir_work, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
-  message(paste0("EB Observed vs Predicted : ", obs_vs_pred_name))  
+  message(paste0("EB Observed vs Predicted: ", obs_vs_pred_name))  
 }
 
 env_eb$numder_2 <- function(x, pos, delta = .01){
