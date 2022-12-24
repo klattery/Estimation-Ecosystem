@@ -778,7 +778,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
                      con_matrix = con_matrix)
   if (nrow(con_matrix)>0){
     check_con <- min(con_matrix %*% x_initial$par)
-    if (check_con < 0) message("Please check constraints. Could not find initial value that satisfied your constraints. HB estimation can run, but Empirical Bayes cannot.")    
+    if (check_con <= 0) message("Please check constraints. Could not find initial value that satisfied your constraints. HB estimation can run, but Empirical Bayes cannot.")    
   }
   
   
@@ -1037,17 +1037,38 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   } else message(" All respondent mean utilities obey constraints")
 }
 
-env_stan$est_agg_model <- function(data_list, maxit = 100, reltol = 1e-5){
+env_stan$est_agg_model <- function(data_list, maxit = 100, reltol = 1e-5, con_use = 0){
   data_list$wts <- data_list$wts[data_list$idtask_r] # Convert task weights to row weights
   model_agg <- list(
     func = list(pred = PredMNL, min = LL_Neg, gr = grad_MNL),
     x0 =  rep(0, data_list$P) # start at 0
   )
   cat("Estimating aggregate MNL model for checking\n")
-  agg_beta <- optim(par = model_agg$x0, fn = model_agg$func$min, gr = model_agg$func$gr, method ="BFGS",
-                    data_list = data_list, model_env = model_agg, control = list(maxit = maxit, reltol = reltol, trace = 1, REPORT = 1))
+  if (con_use == 0){
+    agg_beta <- optim(par = model_agg$x0, fn = model_agg$func$min, gr = model_agg$func$gr, method ="BFGS",
+                      data_list = data_list, model_env = model_agg, control = list(maxit = maxit, reltol = reltol, trace = 1, REPORT = 1))
+  } else {
+    con_matrix <- diag(data_list$con_sign)
+    con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], data_list$paircon_matrix)
+    check_con <- min(con_matrix %*% data_list$x0)
+    message(check_con)
+    if (check_con <= 0){
+      message("Constrained model not estimated. Starting value in data$x0 does not satisfy constraints")
+      message("Estimating unconstrained aggregate model")
+      agg_beta <- optim(par = model_agg$x0, fn = model_agg$func$min, gr = model_agg$func$gr, method ="BFGS",
+                        data_list = data_list, model_env = model_agg, control = list(maxit = maxit, reltol = reltol, trace = 1, REPORT = 1))
+    } else {
+      agg_beta <- constrOptim(theta = data_list$x0, f = model_agg$func$min, grad = model_agg$func$gr,
+                              ui = con_matrix, ci = rep(0,nrow(con_matrix)), mu = 1e-02, 
+                              method = "BFGS", outer.iterations = 100, outer.eps = 1e-05, 
+                              data_list = data_list,
+                              model_env = model_agg,
+                              control = list(maxit = maxit, reltol = reltol, trace = 1, REPORT = 1))   
+    }
+  }
   return(agg_beta)
 }
+
 
 env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, cov_scale, linux = TRUE, nids_core = 5){
   cat("\n")
