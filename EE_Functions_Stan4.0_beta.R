@@ -915,7 +915,7 @@ env_stan$get_mean_beta <- function(draws_beta){
   return(result)
 }
 
-env_stan$get_covariates <- function(HB_fit, data_stan){
+env_stan$get_covariates <- function(HB_fit, data_stan, dir_out){
   draws_i_cov_load <- read_cmdstan_csv(HB_fit$output_files(), variables = "i_cov_load", format = "draws_list")
   nchains <- length(draws_i_cov_load$post_warmup_draws)
   result <- matrix(
@@ -925,11 +925,11 @@ env_stan$get_covariates <- function(HB_fit, data_stan){
     byrow = TRUE) # First P entries are Covariate level 1
   result <- (data_stan$code_master %*% t(result)) %*% t(data_stan$covariates_code) # Back code parameters
   result <-  cbind(parameters = rownames(result), data.frame(result))
-  write.table(result, file = file.path(dir$work, paste0(out_prefix,"_covariates.csv")), sep = ",", na = ".", row.names = TRUE)
+  write.table(result, file = file.path(dir_out, paste0(out_prefix,"_covariates.csv")), sep = ",", na = ".", row.names = TRUE)
   return(result)
 }
 
-env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_work){
+env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_out){
   nchains <- length(draws_beta$post_warmup_draws)
   nresp <- draws_beta$metadata$stan_variable_sizes$beta_ind[2] # num respondents
   npar <- draws_beta$metadata$stan_variable_sizes$beta_ind[1]
@@ -946,7 +946,7 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_wo
   ))
   
   hist(as.vector(sapply(draws_beta$post_warmup_sampler_diagnostics, function(x) x$accept_stat__)), breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
-  saveRDS(draws_beta, file.path(dir_work, draws_name)) # drop warmup
+  saveRDS(draws_beta$metadata, file.path(dir_out, paste0(out_prefix,"_metadata.rds")))
   
   # Get mean of respondent betas for each iteration (like alpha in constrained space)
   ndraws <- draws_beta$metadata$iter_sampling
@@ -956,9 +956,8 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_wo
     draws_beta_mu[[chain_i]] <- t(aggregate.data.frame(data.frame(x), by = list(rep(1:npar, nresp)), FUN = "mean")[,-1])
   }
   
-  
   # Create pdf of acceptance rate + traceplots 
-  pdf(file = file.path(dir_work, pdf_name),   # The directory you want to save the file in
+  pdf(file = file.path(dir_out, pdf_name),   # The directory you want to save the file in
       width = 7, # The width of the plot in inches
       height = 5) # The height of the plot in inches
   hist(as.vector(sapply(draws_beta$post_warmup_sampler_diagnostics, function(x) x$accept_stat__)), breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
@@ -968,7 +967,7 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_wo
   }
   fit_stats <- plot_draws_df(draws= draws_beta_mu, vnames = vnames, ylab = "Mean Beta") # Plots each column
   dev.off()
-  write.table(fit_stats, file = file.path(dir_work, paste0(out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
+  write.table(fit_stats, file = file.path(dir_out, paste0(out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
 }
 
 env_stan$obs_vs_pred <- function(wts_obs_pred, cat_vars, predvar_out = "pred_per"){
@@ -1037,6 +1036,19 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   } else message(" All respondent mean utilities obey constraints")
 }
 
+env_stan$zip_and_remove <- function(files_dir, out_dir, out_name, out_prefix, remove_dir = TRUE, save_specs = TRUE, save_draws = FALSE){
+  # Zip all files in in_dir to file.path(out_dir, out_names)
+  # Default: Remove directory where initial files were stored
+  if (save_specs) saveRDS(object = list(code_master = indcode_list$code_master,
+                                        specs_att_coding = specs_att_coding,
+                                        specs_pair_constraints = specs_pair_constraints,
+                                        specs_cov_coding  = specs_cov_coding),
+          file.path(files_dir, paste0(out_prefix,"_specs.rds")))
+  if (save_draws) saveRDS(draws_beta, file.path(files_dir, paste0(out_prefix,"_draws_beta.rds")))
+  zip::zip(zipfile = file.path(out_dir, out_name), files = file.path(files_dir, list.files(files_dir)), mode = "cherry-pick") 
+  if (files_dir != out_dir) unlink(files_dir, recursive = remove_dir) # Remove files
+}
+
 env_stan$est_agg_model <- function(data_list, maxit = 100, reltol = 1e-5, con_use = 0){
   data_list$wts <- data_list$wts[data_list$idtask_r] # Convert task weights to row weights
   model_agg <- list(
@@ -1068,6 +1080,7 @@ env_stan$est_agg_model <- function(data_list, maxit = 100, reltol = 1e-5, con_us
   }
   return(agg_beta)
 }
+
 
 
 env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix, dir_work, cov_scale, linux = TRUE, nids_core = 5){
