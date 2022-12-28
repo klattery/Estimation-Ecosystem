@@ -859,7 +859,7 @@ env_stan$message_estimation <- function(dir, stan_outname){
   # For Linux terminal
   cat("While Stan runs, you may check convergence with Stan csv output.\n")
   cat("To create smaller file (stan_part) of 1st 300 columns using Linux terminal:\n")
-  message(paste0("cd ", dir$stanout, "   # Change to Stan output directory and then:\n",
+  message(paste0("cd ", dir, "   # Change to Stan output directory and then:\n",
                  "tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > stan_part.csv"))
 }
 
