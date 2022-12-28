@@ -1036,15 +1036,16 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   } else message(" All respondent mean utilities obey constraints")
 }
 
-env_stan$zip_and_remove <- function(files_dir, out_dir, out_name, out_prefix, remove_dir = TRUE, save_specs = TRUE, save_draws = FALSE){
+env_stan$zip_and_remove <- function(files_dir, out_dir, out_name, out_prefix, remove_dir = TRUE,
+                                    save_specs = TRUE, code_master = NULL, draws_beta = NULL){
   # Zip all files in in_dir to file.path(out_dir, out_names)
   # Default: Remove directory where initial files were stored
-  if (save_specs) saveRDS(object = list(code_master = indcode_list$code_master,
-                                        specs_att_coding = specs_att_coding,
+  if (save_specs) saveRDS(object = list(specs_att_coding = specs_att_coding,
                                         specs_pair_constraints = specs_pair_constraints,
                                         specs_cov_coding  = specs_cov_coding),
           file.path(files_dir, paste0(out_prefix,"_specs.rds")))
-  if (save_draws) saveRDS(draws_beta, file.path(files_dir, paste0(out_prefix,"_draws_beta.rds")))
+  if (!is.null(code_master)) write.csv(code_master, file.path(files_dir, paste0(out_prefix,"_code_master.csv")))
+  if !(is.null(draws_beta) saveRDS(draws_beta, file.path(files_dir, paste0(out_prefix,"_draws_beta.rds")))
   zip::zip(zipfile = file.path(out_dir, out_name), files = file.path(files_dir, list.files(files_dir)), mode = "cherry-pick") 
   if (files_dir != out_dir) unlink(files_dir, recursive = remove_dir) # Remove files
 }
