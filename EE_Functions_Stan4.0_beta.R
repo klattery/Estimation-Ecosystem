@@ -855,13 +855,22 @@ env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
   return(result)
 }
 
-env_stan$message_estimation <- function(dir, stan_outname){
-  # For Linux terminal
+env_stan$create_tempdir <- function(dir, out_prefix, time_now, save_specs = TRUE, code_master = NULL){
+  #  dir.create(my_temp <- tempfile(pattern = paste0(out_prefix,"_"), tmpdir = dir$work))
+  dir.create(my_temp <- file.path(dir$work, paste0(out_prefix, "_", time_now)))
+  dir.create(stan_out <- file.path(my_temp, "stan_out"))
+  if (save_specs) saveRDS(object = list(specs_att_coding = specs_att_coding,
+                                        specs_pair_constraints = specs_pair_constraints,
+                                        specs_cov_coding  = specs_cov_coding),
+                          file.path(my_temp, paste0(out_prefix,"_specs.rds")))
+  if (!is.null(code_master)) write.csv(code_master, file.path(my_temp, paste0(out_prefix,"_code_master.csv")))
   cat("While Stan runs, you may check convergence with Stan csv output.\n")
   cat("To create smaller file (stan_part) of 1st 300 columns using Linux terminal:\n")
-  message(paste0("cd ", dir, "   # Change to Stan output directory and then:\n",
+  message(paste0("cd ", stan_out, "   # Change to Stan output directory and then:\n",
                  "tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > stan_part.csv"))
+  return(my_temp)
 }
+  
 
 env_stan$plot_draws_df <- function(draws, vnames = NULL, ylab = "Draw", pdf_path = NULL,
                                    chain_colors = rep(c("red","blue","green","black"),2)){
@@ -1036,19 +1045,15 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   } else message(" All respondent mean utilities obey constraints")
 }
 
-env_stan$zip_and_remove <- function(files_dir, out_dir, out_name, out_prefix, remove_dir = TRUE,
-                                    save_specs = TRUE, code_master = NULL, draws_beta = NULL){
+env_stan$zip_allout <- function(files_dir, out_dir, out_name, zip_draws_beta = NULL){
   # Zip all files in in_dir to file.path(out_dir, out_names)
   # Default: Remove directory where initial files were stored
-  if (save_specs) saveRDS(object = list(specs_att_coding = specs_att_coding,
-                                        specs_pair_constraints = specs_pair_constraints,
-                                        specs_cov_coding  = specs_cov_coding),
-          file.path(files_dir, paste0(out_prefix,"_specs.rds")))
-  if (!is.null(code_master)) write.csv(code_master, file.path(files_dir, paste0(out_prefix,"_code_master.csv")))
-  if (!is.null(draws_beta)) saveRDS(draws_beta, file.path(files_dir, paste0(out_prefix,"_draws_beta.rds")))
-  zip::zip(zipfile = file.path(out_dir, out_name), files = file.path(files_dir, list.files(files_dir)), mode = "cherry-pick") 
-  if (files_dir != out_dir) unlink(files_dir, recursive = remove_dir) # Remove files
-  message(paste0("Files zipped into: ", out_name))
+  if (zip_draws_beta) saveRDS(draws_beta, file.path(files_dir, paste0(out_prefix,"_draws_beta.rds")))
+  options(warn = -1)
+  zip::zip(zipfile = file.path(out_dir, out_name), files = file.path(files_dir, list.files(files_dir)),
+           include_directories = FALSE, recurse = FALSE, mode = "cherry-pick") 
+  options(warn = 0)
+  message(paste0("Files zipped into folder", out_dir, " : ", out_name, "\n"))
 }
 
 env_stan$est_agg_model <- function(data_list, maxit = 100, reltol = 1e-5, con_use = 0){
