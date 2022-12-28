@@ -1048,6 +1048,7 @@ env_stan$zip_and_remove <- function(files_dir, out_dir, out_name, out_prefix, re
   if (!is.null(draws_beta)) saveRDS(draws_beta, file.path(files_dir, paste0(out_prefix,"_draws_beta.rds")))
   zip::zip(zipfile = file.path(out_dir, out_name), files = file.path(files_dir, list.files(files_dir)), mode = "cherry-pick") 
   if (files_dir != out_dir) unlink(files_dir, recursive = remove_dir) # Remove files
+  message(paste0("Files zipped into: ", out_name))
 }
 
 env_stan$est_agg_model <- function(data_list, maxit = 100, reltol = 1e-5, con_use = 0){
