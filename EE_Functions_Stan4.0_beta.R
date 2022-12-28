@@ -1045,7 +1045,7 @@ env_stan$zip_and_remove <- function(files_dir, out_dir, out_name, out_prefix, re
                                         specs_cov_coding  = specs_cov_coding),
           file.path(files_dir, paste0(out_prefix,"_specs.rds")))
   if (!is.null(code_master)) write.csv(code_master, file.path(files_dir, paste0(out_prefix,"_code_master.csv")))
-  if !(is.null(draws_beta) saveRDS(draws_beta, file.path(files_dir, paste0(out_prefix,"_draws_beta.rds")))
+  if (!is.null(draws_beta)) saveRDS(draws_beta, file.path(files_dir, paste0(out_prefix,"_draws_beta.rds")))
   zip::zip(zipfile = file.path(out_dir, out_name), files = file.path(files_dir, list.files(files_dir)), mode = "cherry-pick") 
   if (files_dir != out_dir) unlink(files_dir, recursive = remove_dir) # Remove files
 }
