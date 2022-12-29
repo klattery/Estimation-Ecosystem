@@ -763,7 +763,9 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   
   # Check for collinearity
   if (check_collinearity){
-    result$collinear <- check_collinear(result$ind)
+    if (nrow(result$ind) > 1000000){
+        results$collinear <- check_collinear(result$ind[c(1:500000, nrow(result$ind) - 499999:nrow(result$ind)),])
+    } else result$collinear <- check_collinear(result$ind)
   }  
   
   # Get initial x0 that satisfies constraints
