@@ -763,8 +763,9 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   
   # Check for collinearity
   if (check_collinearity){
-    if (nrow(result$ind) > 1000000){
-        results$collinear <- check_collinear(result$ind[c(1:500000, nrow(result$ind) - 499999:nrow(result$ind)),])
+    if (nrow(result$ind) > 1100000){
+        results$collinear <- check_collinear(result$ind[c(1:500000, (nrow(result$ind) - 499999):nrow(result$ind)),])
+        cat("Large data file, so checking collinearity for subset of 1 million rows")
     } else result$collinear <- check_collinear(result$ind)
   }  
   
@@ -780,7 +781,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
                      con_matrix = con_matrix)
   if (nrow(con_matrix)>0){
     check_con <- min(con_matrix %*% x_initial$par)
-    if (check_con <= 0) message("Please check constraints. Could not find initial value that satisfied your constraints. HB estimation can run, but Empirical Bayes cannot.")    
+    if (check_con <= 0) message("Please check constraints. Could not find initial value that satisfied your constraints. HB estimation in Stan can run, but constrained optimization models in R like Empirical Bayes cannot.")    
   }
   
   
