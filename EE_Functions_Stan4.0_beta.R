@@ -1003,7 +1003,7 @@ env_stan$obs_vs_pred <- function(wts_obs_pred, cat_vars, predvar_out = "pred_per
 }
 
 env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_work,
-                                       task_type = NULL, inv_logit_thresh = 0){
+                                       task_type = NULL, inv_logit_thresh = NULL){
   # Compute predictions
   row_weights <- data_stan$wts[data_stan$idtask_r] # convert task weights to row weights
   if (is.null(task_type)){ # Standard MNL
@@ -1026,7 +1026,7 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
                                         if (task_type[t] == 2){ # Inv Logit
                                           U <- exp(data_stan$ind[data_stan$start[t]:data_stan$end[t],] %*%
                                                      utilities[data_stan$task_individual[t],])
-                                          if (inv_logit_thresh == 0){
+                                          if (is.null(inv_logit_thresh)){
                                             pred <- U/(1+U)
                                           } else pred <- U/(exp(inv_logit_thresh[t]) + U)
                                         }                                       
