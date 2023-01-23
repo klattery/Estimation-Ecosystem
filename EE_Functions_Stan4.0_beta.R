@@ -1002,17 +1002,38 @@ env_stan$obs_vs_pred <- function(wts_obs_pred, cat_vars, predvar_out = "pred_per
   return(obs_vs_pred)
 }
 
-env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_work){
+env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_work,
+                                       task_type = NULL, inv_logit_thresh = 0){
   # Compute predictions
   row_weights <- data_stan$wts[data_stan$idtask_r] # convert task weights to row weights
-  pred_all <- do.call(rbind, lapply(1:data_stan$T,
-                                    function(t){
-                                      U <- exp(data_stan$ind[data_stan$start[t]:data_stan$end[t],] %*%
-                                                 utilities[data_stan$task_individual[t],])
-                                      pred <- U/sum(U)
-                                      return(pred)
-                                    }
-  )) # lapply, rbind
+  if (is.null(task_type)){ # Standard MNL
+    pred_all <- do.call(rbind, lapply(1:data_stan$T,
+                                      function(t){
+                                        U <- exp(data_stan$ind[data_stan$start[t]:data_stan$end[t],] %*%
+                                                   utilities[data_stan$task_individual[t],])
+                                        pred <- U/sum(U)
+                                        return(pred)
+                                      }
+    )) # lapply, rbind
+  } else {
+    pred_all <- do.call(rbind, lapply(1:data_stan$T,
+                                      function(t){
+                                        if (task_type[t] == 1){ # MNL
+                                          U <- exp(data_stan$ind[data_stan$start[t]:data_stan$end[t],] %*%
+                                                     utilities[data_stan$task_individual[t],])
+                                          pred <- U/sum(U)
+                                        }
+                                        if (task_type[t] == 2){ # Inv Logit
+                                          U <- exp(data_stan$ind[data_stan$start[t]:data_stan$end[t],] %*%
+                                                     utilities[data_stan$task_individual[t],])
+                                          if (inv_logit_thresh == 0){
+                                            pred <- U/(1+U)
+                                          } else pred <- U/(exp(inv_logit_thresh[t]) + U)
+                                        }                                       
+                                        return(pred)
+                                      }
+    )) # lapply, rbind                                   
+  }
   utilities_r <- utilities %*% t(data_stan$code_master)
   util_name <- paste0(out_prefix,"_utilities_r.csv")
   pred_name <- paste0(out_prefix,"_preds_meanpt.csv")
