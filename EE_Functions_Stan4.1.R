@@ -991,7 +991,8 @@ env_stan$obs_vs_pred <- function(wts_obs_pred, cat_vars, predvar_out = "pred_per
       return(c(base, sum(x[,2]), sum(x[,1] * x[,2])/base, sum(x[,1] * x[,3])/base))
     }))
     result_df <- data.frame(cat_var= colnames(ind_levels)[i],
-                            level = as.numeric(rownames(result)),
+                            #level = as.numeric(rownames(result)),
+                            level = rownames(result),
                             shows = result[,1],
                             chosen = result[,2],
                             obs_per = result[,3],
