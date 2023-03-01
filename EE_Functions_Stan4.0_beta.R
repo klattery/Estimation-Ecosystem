@@ -861,7 +861,7 @@ env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
 env_stan$create_tempdir <- function(dir, out_prefix, time_now, save_specs = FALSE, code_master = NULL){
   #  dir.create(my_temp <- tempfile(pattern = paste0(out_prefix,"_"), tmpdir = dir$work))
   dir.create(my_temp <- file.path(dir$work, paste0(out_prefix, "_", time_now)))
-  dir.create(stan_out <- file.path(my_temp, "stan_out"))
+  # dir.create(stan_out <- file.path(my_temp, "stan_out"))
   if (save_specs) saveRDS(object = list(specs_att_coding = specs_att_coding,
                                         specs_pair_constraints = specs_pair_constraints,
                                         specs_cov_coding  = specs_cov_coding),
@@ -869,7 +869,7 @@ env_stan$create_tempdir <- function(dir, out_prefix, time_now, save_specs = FALS
   if (!is.null(code_master)) write.csv(code_master, file.path(my_temp, paste0(out_prefix,"_code_master.csv")))
   cat("While Stan runs, you may check convergence with Stan csv output.\n")
   cat("To create smaller file (stan_part) of 1st 300 columns using Linux terminal:\n")
-  message(paste0("cd ", stan_out, "   # Change to Stan output directory and then:\n",
+  message(paste0("cd ", dir$stanmodel, "   # Change to Stan output directory and then:\n",
                  "tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > stan_part.csv"))
   return(my_temp)
 }
