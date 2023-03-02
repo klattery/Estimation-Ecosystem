@@ -858,9 +858,8 @@ env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
   return(result)
 }
 
-env_stan$create_tempdir <- function(dir, out_prefix, time_now, save_specs = FALSE, code_master = NULL){
-  #  dir.create(my_temp <- tempfile(pattern = paste0(out_prefix,"_"), tmpdir = dir$work))
-  dir.create(my_temp <- file.path(dir$work, paste0(out_prefix, "_", time_now)))
+env_stan$create_tempdir <- function(dir, out_folder, save_specs = FALSE, code_master = NULL){
+  dir.create(my_temp <- file.path(dir$work, out_folder))
   # dir.create(stan_out <- file.path(my_temp, "stan_out"))
   if (save_specs) saveRDS(object = list(specs_att_coding = specs_att_coding,
                                         specs_pair_constraints = specs_pair_constraints,
