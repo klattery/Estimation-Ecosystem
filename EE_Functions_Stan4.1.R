@@ -1068,10 +1068,9 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   } else message(" All respondent mean utilities obey constraints")
 }
 
-env_stan$zip_allout <- function(files_dir, out_dir, out_name, zip_draws_beta = NULL){
+env_stan$zip_allout <- function(files_dir, out_dir, out_name){
   # Zip all files in in_dir to file.path(out_dir, out_names)
   # Default: Remove directory where initial files were stored
-  if (zip_draws_beta) saveRDS(draws_beta, file.path(files_dir, paste0(out_prefix,"_draws_beta.rds")))
   options(warn = -1)
   zip::zip(zipfile = file.path(out_dir, out_name), files = file.path(files_dir, list.files(files_dir)),
            include_directories = FALSE, recurse = FALSE, mode = "cherry-pick") 
