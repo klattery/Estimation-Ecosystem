@@ -949,6 +949,7 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_ou
   draws_name <- paste0(out_prefix,"_draws_beta.rds")
   pdf_name <- paste0(out_prefix,"_trace_plots.pdf")
   fit_name <-  paste0(out_prefix,"_fit_stats.csv")
+  cat("\nSaving Results in folder:", dir_out, "\n")
   message(paste0(
     "\nSaving post warm-up files for:\n",
     " convergence stats of mean:     ", fit_name, "\n",
