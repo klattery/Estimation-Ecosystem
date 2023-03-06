@@ -867,7 +867,7 @@ env_stan$create_tempdir <- function(dir, out_folder, save_specs = FALSE, code_ma
                           file.path(my_temp, paste0(out_prefix,"_specs.rds")))
   if (!is.null(code_master)) write.csv(code_master, file.path(my_temp, paste0(out_prefix,"_code_master.csv")))
   cat("\nWhile Stan runs, you may check convergence with Stan csv output.\n")
-  cat("To create smaller file (stan_part) of 1st 300 columns using Linux terminal:\n")
+  cat("To create subset 'stan_part.csv' of first 300 columns using Linux terminal:\n")
   cat(paste0("cd ", dir$stanmodel, "   # Stan output directory and then:\n",
                  "tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > stan_part.csv"))
   return(my_temp)
