@@ -27,7 +27,7 @@ env_shiny$ui_1 <- fluidPage(
       checkboxInput("add_none", "Add None Variable when All Attributes are 0", TRUE),
       checkboxInput("check_collinearity", "Check Collinearity", TRUE),
       checkboxInput("est_aggmodel", "Estimate Aggregate Model", TRUE),
-      textInput("out_prefix", "Text you want to prefix output", value = "MyOut", width = NULL, placeholder = NULL),
+      textInput("out_prefix", "Text you want to prefix output", value = "MyCBC", width = NULL, placeholder = NULL),
       tags$hr(),
       actionButton("setup_ready","Save Changes to R & Exit Upload", class = "btn-primary")
     ),
