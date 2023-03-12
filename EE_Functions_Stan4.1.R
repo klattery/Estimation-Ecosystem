@@ -764,7 +764,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   # Check for collinearity
   if (check_collinearity){
     if (nrow(result$ind) > 1100000){
-        results$collinear <- check_collinear(result$ind[c(1:500000, (nrow(result$ind) - 499999):nrow(result$ind)),])
+        result$collinear <- check_collinear(result$ind[c(1:500000, (nrow(result$ind) - 499999):nrow(result$ind)),])
         cat("Large data file, so checking collinearity for subset of 1 million rows")
     } else result$collinear <- check_collinear(result$ind)
   }  
