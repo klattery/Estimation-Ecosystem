@@ -1144,7 +1144,11 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
     model_id <- model_eb
     resp_mu <- colMeans(resp_draws)
     model_id$prior$alpha <- resp_mu
-    model_id$prior$cov_inv <- solve(cov(resp_draws) * cov_scale)
+    # model_id$prior$cov_inv <- solve(cov(resp_draws) * cov_scale)
+    # Replaced solve with SVD March 21, 2023
+    ksvd <- svd(cov(resp_draws) * cov_scale)
+    ksvd$d[ksvd$d < 1e-12] <- 1e-12
+    model_id$prior$cov_inv <- ksvd$v %*% diag(1/ksvd$d) %*% t(ksvd$u)
     
     id_list <- list()
     id_filter <- (data_stan$match_id == idseq)
