@@ -758,14 +758,14 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
     }
     if (toupper(colnames(data_cov)[2]) %in% c("WTS","WT","WEIGHTS","WEIGHT")){
       result$wts <- make_wts(data_cov, resp_id)[result$task_individual]
-    } else cat("Optional weights variable not found in covariates data.  All data weighted at 1\n")
+    } else cat("Optional weights variable not found in covariates data.  All data weighted at 1")
   } 
   
   # Check for collinearity
   if (check_collinearity){
     if (nrow(result$ind) > 1100000){
-      result$collinear <- check_collinear(result$ind[c(1:500000, (nrow(result$ind) - 499999):nrow(result$ind)),])
-      cat("Large data file, so checking collinearity for subset of 1 million rows\n")
+        result$collinear <- check_collinear(result$ind[c(1:500000, (nrow(result$ind) - 499999):nrow(result$ind)),])
+        cat("Large data file, so checking collinearity for subset of 1 million rows")
     } else result$collinear <- check_collinear(result$ind)
   }  
   
@@ -781,7 +781,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
                      con_matrix = con_matrix)
   if (nrow(con_matrix)>0){
     check_con <- min(con_matrix %*% x_initial$par)
-    if (check_con <= 0) message("Please check constraints. Could not find initial value that satisfied your constraints. HB estimation in Stan can run, but constrained optimization models in R like Empirical Bayes cannot.\n")    
+    if (check_con <= 0) message("Please check constraints. Could not find initial value that satisfied your constraints. HB estimation in Stan can run, but constrained optimization models in R like Empirical Bayes cannot.")    
   }
   
   
@@ -823,6 +823,7 @@ env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
     cov_qr <- cov_qr[-P,-P] # remove last row and column because they are intercept
   } 
   result <- list()
+  result$cor_eigen <- eigen(cov2cor(cov_qr))$value
   rank <- qr_obj$rank
   if (rank < ncol(x)){
     # This code for bad_combos from R package findLinearCombos
@@ -838,15 +839,13 @@ env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
                          function(i) vnames[sort(c(pivot[rank + i], pivot[which(b[,i] != 0)]))]
     )
     
-    message(paste0("\n############################################",
-                   "\nWARNING!!!! YOUR DESIGN IS DEFICIENT",
-                   "\nThe following variables are perfectly collinear:",
-                   paste("\n", bad_combos, collapse = ""),
-                   "\n############################################\n"))
+    cat(paste0("\n############################################",
+               "\nWARNING!!!! YOUR DESIGN IS DEFICIENT",
+               "\nThe following variables are perfectly collinear:",
+               paste("\n", bad_combos, collapse = ""),
+               "\n############################################\n"))
     result$bad_combos <- bad_combos
-    result <- c(result, list(cor_eigen = NULL))
   } else {
-    result$cor_eigen <- eigen(cov2cor(cov_qr))$value
     if (min(result$cor_eigen) < 1e-10){
       cat(paste0("\n############################################",
                  "\nWARNING!!!! YOUR DESIGN MAY BE DEFICIENT.",
@@ -859,7 +858,6 @@ env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
   return(result)
 }
 
-
 env_stan$create_tempdir <- function(dir, out_folder, save_specs = FALSE, code_master = NULL){
   dir.create(my_temp <- file.path(dir$work, out_folder))
   # dir.create(stan_out <- file.path(my_temp, "stan_out"))
@@ -871,10 +869,10 @@ env_stan$create_tempdir <- function(dir, out_folder, save_specs = FALSE, code_ma
   cat("\nWhile Stan runs, you may check convergence with Stan csv output.\n")
   cat("To create subset 'stan_part.csv' of first 300 columns using Linux terminal:\n")
   cat(paste0("cd ", dir$stanmodel, "   # Stan output directory and then:\n",
-             "tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > stan_part.csv"))
+                 "tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > stan_part.csv"))
   return(my_temp)
 }
-
+  
 
 env_stan$plot_draws_df <- function(draws, vnames = NULL, ylab = "Draw", pdf_path = NULL,
                                    chain_colors = rep(c("red","blue","green","black"),2)){
@@ -1054,7 +1052,7 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   ))
   
   write.table(cbind(header, utilities_r), file = file.path(dir_work, util_name), sep = ",", na = ".", row.names = FALSE)
-  
+
   pred_all_export <- cbind(data_stan$idtask, wts = row_weights, dep = data_stan$dep, pred = pred_all)
   write.table(pred_all_export, file = file.path(dir_work, pred_name), sep = ",", na = ".", row.names = FALSE)
   if (ncol(data_stan$ind_levels) >0){
@@ -1776,4 +1774,5 @@ attach(env_code)
 attach(env_modfun)
 attach(env_eb)
 attach(env_stan)
+
 
