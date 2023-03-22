@@ -843,8 +843,8 @@ env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
                    "\nThe following variables are perfectly collinear:",
                    paste("\n", bad_combos, collapse = ""),
                    "\n############################################\n"))
-    result$bad_combos <- bad_combos
-    result <- c(result, list(cor_eigen = NULL))
+    # result$bad_combos <- bad_combos
+    result$cor_eigen <- 0
   } else {
     result$cor_eigen <- eigen(cov2cor(cov_qr))$value
     if (min(result$cor_eigen) < 1e-10){
