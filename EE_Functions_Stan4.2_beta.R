@@ -298,6 +298,14 @@ env_code$ordmatrix2 <- function(num_levels) {
   return(ord_matrix)
 }
 
+kdata <- data.frame(test = c(2,2,3,4,3,2,4,5,0,4))
+vname <- "test"
+cut_pts <- NULL
+thermcode <- FALSE
+varout <- vname
+setna <- 0
+con_sign <- 0
+
 env_code$ordcode <- function(kdata, vname, cut_pts = NULL, thermcode = TRUE, varout = NULL, setna = 0, con_sign = 0) {
   # xvec must be vector
   # cut_pts must be sequential vector from low to high.  if null then all values except c(0,NA)
@@ -308,35 +316,50 @@ env_code$ordcode <- function(kdata, vname, cut_pts = NULL, thermcode = TRUE, var
   con_sign[is.na(con_sign)] <- 0
   xvec <- kdata[[vname]]
   if (is.null(cut_pts)){
+    na_vals <- is.na(xvec) | xvec == 0
+    xvec[na_vals] <- NA
+    kmax <- max(xvec, na.rm = TRUE)
+    xvec[na_vals] <- kmax # temp set to max
     cut_pts <- sort(unique(xvec)) # Unique values
-    cut_pts <- cut_pts[!(cut_pts %in% c(0, NA))]  # But exclude values in vector of setna (default 0,NA)
+    newval <- match(xvec,cut_pts)
+    if (thermcode){
+      code_matrix <- ordmatrix2(length(cut_pts))
+    } else code_matrix <- ordmatrix(length(cut_pts))
+    outcode <- (code_matrix[newval,TRUE,drop = FALSE])
+    outcode[na_vals,] <- setna
+    newval[na_vals] <- setna
+    vnames <- unlist(lapply(2:length(cut_pts), function(i) paste0(varout, "_",cut_pts[i-1],"_", cut_pts[i])))
+    colnames(code_matrix) <- colnames(outcode) <- vnames
+    varnames <- paste0(varout, "_", cut_pts)
+    return(list(outcode = outcode, code_matrix = code_matrix, levels = newval, con_sign = rep(con_sign, ncol(code_matrix)), vnames = varnames, prior = diag(ncol(code_matrix))))
+  } else{
+    bad <- xvec < min(cut_pts) | xvec > max(cut_pts) | is.na(xvec)
+    xvec[bad] <- min(cut_pts) # temp set to min
+    high <- sapply(cut_pts, function(x) xvec <= x)
+    high_col <- apply(high, 1, function(x) match(TRUE, x))
+    low_col <- pmax(high_col - 1,1)
+    low_pt <- cut_pts[low_col] 
+    high_pt <- cut_pts[high_col] 
+    dist1 <- (high_pt - xvec)/(high_pt - low_pt)
+    dist1[is.na(dist1)] <- 0
+    dist2 <- 1 - dist1
+    mat0 <- matrix(0, length(xvec), length(cut_pts))
+    mat_low <- mat0
+    mat_high <- mat0
+    mat_low[cbind(1:length(xvec),low_col)] <- dist1 
+    mat_high[cbind(1:length(xvec),high_col)] <- dist2 
+    rowcode <- mat_low + mat_high
+    if (thermcode){
+      code_matrix <- ordmatrix2(length(cut_pts))
+    } else code_matrix <- ordmatrix(length(cut_pts))
+    ordcode <- round(rowcode %*% code_matrix, 5)
+    ordcode[bad] <- setna # reset initial NA (default 0)
+    vnames <- unlist(lapply(2:length(cut_pts), function(i) paste0(varout, "_",cut_pts[i-1],"_", cut_pts[i])))
+    colnames(ordcode) <- vnames
+    colnames(code_matrix) <- vnames
+    varnames <- paste0(varout, "_", cut_pts)
+    return(list(outcode = ordcode, code_matrix = code_matrix, con_sign = rep(con_sign, ncol(code_matrix)), vnames = varnames, prior = diag(ncol(code_matrix))))
   }
-  bad <- xvec < min(cut_pts) | xvec > max(cut_pts) | is.na(xvec)
-  xvec[bad] <- min(cut_pts) # temp set to min
-  high <- sapply(cut_pts, function(x) xvec <= x)
-  high_col <- apply(high, 1, function(x) match(TRUE, x))
-  low_col <- pmax(high_col - 1,1)
-  low_pt <- cut_pts[low_col] 
-  high_pt <- cut_pts[high_col] 
-  dist1 <- (high_pt - xvec)/(high_pt - low_pt)
-  dist1[is.na(dist1)] <- 0
-  dist2 <- 1 - dist1
-  mat0 <- matrix(0, length(xvec), length(cut_pts))
-  mat_low <- mat0
-  mat_high <- mat0
-  mat_low[cbind(1:length(xvec),low_col)] <- dist1 
-  mat_high[cbind(1:length(xvec),high_col)] <- dist2 
-  rowcode <- mat_low + mat_high
-  if (thermcode){
-    code_matrix <- ordmatrix2(length(cut_pts))
-  } else code_matrix <- ordmatrix(length(cut_pts))
-  ordcode <- round(rowcode %*% code_matrix, 5)
-  ordcode[bad] <- setna # reset initial NA (default 0)
-  vnames <- unlist(lapply(2:length(cut_pts), function(i) paste0(varout, "_",cut_pts[i-1],"_", cut_pts[i])))
-  colnames(ordcode) <- vnames
-  colnames(code_matrix) <- vnames
-  varnames <- paste0(varout, "_", cut_pts)
-  return(list(outcode = ordcode, code_matrix = code_matrix, con_sign = rep(con_sign, ncol(code_matrix)), vnames = varnames, prior = diag(ncol(code_matrix))))
 }
 
 env_code$check_atts_constraints <- function(data_in, att_coding, constraints){
@@ -758,14 +781,14 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
     }
     if (toupper(colnames(data_cov)[2]) %in% c("WTS","WT","WEIGHTS","WEIGHT")){
       result$wts <- make_wts(data_cov, resp_id)[result$task_individual]
-    } else cat("Optional weights variable not found in covariates data.  All data weighted at 1")
+    } else cat("Optional weights variable not found in covariates data.  All data weighted at 1\n")
   } 
   
   # Check for collinearity
   if (check_collinearity){
     if (nrow(result$ind) > 1100000){
-        result$collinear <- check_collinear(result$ind[c(1:500000, (nrow(result$ind) - 499999):nrow(result$ind)),])
-        cat("Large data file, so checking collinearity for subset of 1 million rows")
+      result$collinear <- check_collinear(result$ind[c(1:500000, (nrow(result$ind) - 499999):nrow(result$ind)),])
+      cat("Large data file, so checking collinearity for subset of 1 million rows\n")
     } else result$collinear <- check_collinear(result$ind)
   }  
   
@@ -781,7 +804,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
                      con_matrix = con_matrix)
   if (nrow(con_matrix)>0){
     check_con <- min(con_matrix %*% x_initial$par)
-    if (check_con <= 0) message("Please check constraints. Could not find initial value that satisfied your constraints. HB estimation in Stan can run, but constrained optimization models in R like Empirical Bayes cannot.")    
+    if (check_con <= 0) message("Please check constraints. Could not find initial value that satisfied your constraints. HB estimation in Stan can run, but constrained optimization models in R like Empirical Bayes cannot.\n")    
   }
   
   
@@ -823,7 +846,6 @@ env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
     cov_qr <- cov_qr[-P,-P] # remove last row and column because they are intercept
   } 
   result <- list()
-  result$cor_eigen <- eigen(cov2cor(cov_qr))$value
   rank <- qr_obj$rank
   if (rank < ncol(x)){
     # This code for bad_combos from R package findLinearCombos
@@ -839,13 +861,15 @@ env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
                          function(i) vnames[sort(c(pivot[rank + i], pivot[which(b[,i] != 0)]))]
     )
     
-    cat(paste0("\n############################################",
-               "\nWARNING!!!! YOUR DESIGN IS DEFICIENT",
-               "\nThe following variables are perfectly collinear:",
-               paste("\n", bad_combos, collapse = ""),
-               "\n############################################\n"))
-    result$bad_combos <- bad_combos
+    message(paste0("\n############################################",
+                   "\nWARNING!!!! YOUR DESIGN IS DEFICIENT",
+                   "\nThe following variables are perfectly collinear:",
+                   paste("\n", bad_combos, collapse = ""),
+                   "\n############################################\n"))
+    # result$bad_combos <- bad_combos
+    result$cor_eigen <- 0
   } else {
+    result$cor_eigen <- eigen(cov2cor(cov_qr))$value
     if (min(result$cor_eigen) < 1e-10){
       cat(paste0("\n############################################",
                  "\nWARNING!!!! YOUR DESIGN MAY BE DEFICIENT.",
@@ -858,6 +882,7 @@ env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
   return(result)
 }
 
+
 env_stan$create_tempdir <- function(dir, out_folder, save_specs = FALSE, code_master = NULL){
   dir.create(my_temp <- file.path(dir$work, out_folder))
   # dir.create(stan_out <- file.path(my_temp, "stan_out"))
@@ -869,10 +894,10 @@ env_stan$create_tempdir <- function(dir, out_folder, save_specs = FALSE, code_ma
   cat("\nWhile Stan runs, you may check convergence with Stan csv output.\n")
   cat("To create subset 'stan_part.csv' of first 300 columns using Linux terminal:\n")
   cat(paste0("cd ", dir$stanmodel, "   # Stan output directory and then:\n",
-                 "tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > stan_part.csv"))
+             "tail -n +45 '",stan_outname,"-1.csv'  | cut -d, -f 1-300 > stan_part.csv"))
   return(my_temp)
 }
-  
+
 
 env_stan$plot_draws_df <- function(draws, vnames = NULL, ylab = "Draw", pdf_path = NULL,
                                    chain_colors = rep(c("red","blue","green","black"),2)){
@@ -1051,13 +1076,14 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
     " Observed vs Predicted    : ", obs_vs_pred_name 
   ))
   
-  pred_all_export <- cbind(data_stan$idtask, wts = row_weights, dep = data_stan$dep, pred = pred_all)
-  obs_vs_pred <- obs_vs_pred(pred_all_export[,3:5], data_stan$ind_levels)
-  
   write.table(cbind(header, utilities_r), file = file.path(dir_work, util_name), sep = ",", na = ".", row.names = FALSE)
-  write.table(pred_all_export, file = file.path(dir_work, pred_name), sep = ",", na = ".", row.names = FALSE)
-  write.table(obs_vs_pred, file = file.path(dir_work, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
   
+  pred_all_export <- cbind(data_stan$idtask, wts = row_weights, dep = data_stan$dep, pred = pred_all)
+  write.table(pred_all_export, file = file.path(dir_work, pred_name), sep = ",", na = ".", row.names = FALSE)
+  if (ncol(data_stan$ind_levels) >0){
+    obs_vs_pred <- obs_vs_pred(pred_all_export[,3:5], data_stan$ind_levels)
+    write.table(obs_vs_pred, file = file.path(dir_work, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
+  } else message("No Categorical Variables found for observed vs predicted")
   # Check if utilities meet constraints
   con_matrix <- diag(data_stan$con_sign)
   con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], data_stan$paircon_matrix)
@@ -1143,7 +1169,11 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
     model_id <- model_eb
     resp_mu <- colMeans(resp_draws)
     model_id$prior$alpha <- resp_mu
-    model_id$prior$cov_inv <- solve(cov(resp_draws) * cov_scale)
+    # model_id$prior$cov_inv <- solve(cov(resp_draws) * cov_scale)
+    # Replaced solve with SVD March 21, 2023
+    ksvd <- svd(cov(resp_draws) * cov_scale)
+    ksvd$d[ksvd$d < 1e-12] <- 1e-12
+    model_id$prior$cov_inv <- ksvd$v %*% diag(1/ksvd$d) %*% t(ksvd$u)
     
     id_list <- list()
     id_filter <- (data_stan$match_id == idseq)
@@ -1769,5 +1799,4 @@ attach(env_code)
 attach(env_modfun)
 attach(env_eb)
 attach(env_stan)
-
 
