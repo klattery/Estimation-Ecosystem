@@ -758,7 +758,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   id_row_beg <- data_stan$start[task_beg]
   id_row_end <- data_stan$end[task_end]
   result$individual_range <- cbind(task_beg = id_task_beg, task_end = id_task_end,
-                                 row_beg = id_row_beg, row_end = id_row_end)
+                                 row_beg = id_row_beg, row_end = id_row_end, nrows = id_row_end - id_row_beg + 1)
 
   if (!is.null(other_data)) {
     result$other_data <- as.matrix(other_data)[sort_order,]
