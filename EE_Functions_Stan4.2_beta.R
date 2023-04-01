@@ -752,7 +752,8 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   result$end <- c(which(diff(idtask_r)!=0), length(idtask_r))
   result$start <- c(1, result$end[-length(result$end)]+1)
   result$task_individual <- match_id[result$start]
-  id_task_end <- which(diff(result$task_individual, lag = 1) != 0)
+  id_task_end <- c(which(diff(result$task_individual, lag = 1) != 0),
+                   length(result$task_individual))
   id_task_beg <- c(1, id_task_end[-length(id_task_end)]+1)
   result$ind_task_range <- cbind(task_beg = id_task_beg, task_end = id_task_end)
 
