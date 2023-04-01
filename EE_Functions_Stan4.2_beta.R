@@ -757,6 +757,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   id_task_beg <- c(1, id_task_end[-length(id_task_end)]+1)
   id_row_beg <- data_stan$start[task_beg]
   id_row_end <- data_stan$end[task_end]
+  #
   result$id_ranges <- cbind(task_beg = id_task_beg, task_end = id_task_end,
                                  row_beg = id_row_beg, row_end = id_row_end, nrows = id_row_end - id_row_beg + 1)
 
