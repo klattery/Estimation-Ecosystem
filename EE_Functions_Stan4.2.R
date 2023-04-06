@@ -298,14 +298,6 @@ env_code$ordmatrix2 <- function(num_levels) {
   return(ord_matrix)
 }
 
-kdata <- data.frame(test = c(2,2,3,4,3,2,4,5,0,4))
-vname <- "test"
-cut_pts <- NULL
-thermcode <- FALSE
-varout <- vname
-setna <- 0
-con_sign <- 0
-
 env_code$ordcode <- function(kdata, vname, cut_pts = NULL, thermcode = TRUE, varout = NULL, setna = 0, con_sign = 0) {
   # xvec must be vector
   # cut_pts must be sequential vector from low to high.  if null then all values except c(0,NA)
