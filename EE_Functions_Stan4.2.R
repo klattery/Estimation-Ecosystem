@@ -827,7 +827,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
     cov_block = matrix(1, ncol(result$ind), ncol(result$ind)),
     prior_cov_scale = 1,
     x0 = x_initial$par,
-    threads_rec = min(max(1,(detectCores() - 2)/2), round(.5 + result$T/(1000)), 24),
+    threads_rec = min(max(1,(detectCores() - 2)/2), round(.5 + result$T/500), round(.5 + result$I/16)),
     idtask = idtask, idtask_r = idtask_r,
     resp_id = resp_id, match_id = match_id,
     other_data = other_data))) 
@@ -973,16 +973,16 @@ env_stan$get_covariates <- function(HB_fit, data_stan, dir_out){
   return(result)
 }
 
-env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_out, export_draws = FALSE){
+env_stan$checkconverge_export <- function(draws_beta, vnames, control_code){
   nchains <- length(draws_beta$post_warmup_draws)
   nresp <- draws_beta$metadata$stan_variable_sizes$beta_ind[2] # num respondents
   npar <- draws_beta$metadata$stan_variable_sizes$beta_ind[1]
   
   ### Save output files and check convergence ###
-  draws_name <- paste0(out_prefix,"_draws_beta.rds")
-  pdf_name <- paste0(out_prefix,"_trace_plots.pdf")
-  fit_name <-  paste0(out_prefix,"_fit_stats.csv")
-  cat("\nSaving Results in folder:", dir_out, "\n")
+  draws_name <- paste0(control_code$out_prefix,"_draws_beta.rds")
+  pdf_name <- paste0(control_code$out_prefix,"_trace_plots.pdf")
+  fit_name <-  paste0(control_code$out_prefix,"_fit_stats.csv")
+  cat("\nSaving Results in folder:", control_code$dir_run, "\n")
   message(paste0(
     "\nSaving post warm-up files for:\n",
     " convergence stats of mean:     ", fit_name, "\n",
@@ -990,8 +990,8 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_ou
   ))
   
   hist(as.vector(sapply(draws_beta$post_warmup_sampler_diagnostics, function(x) x$accept_stat__)), breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
-  saveRDS(draws_beta[names(draws_beta) %in% c("metadata","inv_metric","step_size")], file.path(dir_out, paste0(out_prefix,"_metadata.rds")))
-  if (export_draws) saveRDS(draws_beta$post_warmup_draws, file.path(dir_out, paste0(out_prefix,"_draws_beta.rds")))
+  saveRDS(draws_beta[names(draws_beta) %in% c("metadata","inv_metric","step_size")], file.path(control_code$dir_run, paste0(control_code$out_prefix,"_metadata.rds")))
+  if (control_code$export_draws) saveRDS(draws_beta$post_warmup_draws, file.path(control_code$dir_run, paste0(control_code$out_prefix,"_draws_beta.rds")))
   
   # Get mean of respondent betas for each iteration (like alpha in constrained space)
   ndraws <- draws_beta$metadata$iter_sampling
@@ -999,6 +999,11 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_ou
   for (chain_i in (1:nchains)){
     x <- do.call(rbind, draws_beta$post_warmup_draws[[chain_i]]) # bind list  PxResp rows, iter in cols 
     draws_beta_mu[[chain_i]] <- t(aggregate.data.frame(data.frame(x), by = list(rep(1:npar, nresp)), FUN = "mean")[,-1])
+  }
+  if (control_code$export_draws_means){
+    draws_beta_mu_exp <- do.call(rbind, lapply(1:length(draws_beta_mu), function(i){
+      result <- cbind(chain = i, iter = 1:nrow(draws_beta_mu[[i]]), draws_beta_mu[[i]])
+    }))
   }
   
   # Create pdf of acceptance rate + traceplots 
@@ -1035,7 +1040,7 @@ env_stan$obs_vs_pred <- function(wts_obs_pred, cat_vars, predvar_out = "pred_per
   return(obs_vs_pred)
 }
 
-env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_work,
+env_stan$process_utilities <- function(data_stan, utilities, control_code,
                                        task_type = NULL, inv_logit_thresh = NULL){
   # Compute predictions
   row_weights <- data_stan$wts[data_stan$idtask_r] # convert task weights to row weights
@@ -1068,10 +1073,10 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
     )) # lapply, rbind                                   
   }
   utilities_r <- utilities %*% t(data_stan$code_master)
-  util_name <- paste0(out_prefix,"_utilities_r.csv")
-  pred_name <- paste0(out_prefix,"_preds_meanpt.csv")
-  failcon_name <- paste0(out_prefix,"_utilities_failcon.csv")
-  obs_vs_pred_name <- paste0(out_prefix,"_obs_vs_pred.csv")
+  util_name <- paste0(control_code$out_prefix,"_utilities_r.csv")
+  pred_name <- paste0(control_code$out_prefix,"_preds_meanpt.csv")
+  failcon_name <- paste0(control_code$out_prefix,"_utilities_failcon.csv")
+  obs_vs_pred_name <- paste0(control_code$out_prefix,"_obs_vs_pred.csv")
   
   LL_id <- rowsum(log(pred_all) * data_stan$dep * row_weights, data_stan$match_id)
   sum_wts <- rowsum(data_stan$dep * row_weights, data_stan$match_id)
@@ -1084,13 +1089,13 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
     " Observed vs Predicted    : ", obs_vs_pred_name 
   ))
   
-  write.table(cbind(header, utilities_r), file = file.path(dir_work, util_name), sep = ",", na = ".", row.names = FALSE)
+  write.table(cbind(header, utilities_r), file = file.path(control_code$dir_run, util_name), sep = ",", na = ".", row.names = FALSE)
   
   pred_all_export <- cbind(data_stan$idtask, wts = row_weights, dep = data_stan$dep, pred = pred_all)
-  write.table(pred_all_export, file = file.path(dir_work, pred_name), sep = ",", na = ".", row.names = FALSE)
+  write.table(pred_all_export, file = file.path(control_code$dir_run, pred_name), sep = ",", na = ".", row.names = FALSE)
   if (ncol(data_stan$ind_levels) >0){
     obs_vs_pred <- obs_vs_pred(pred_all_export[,3:5], data_stan$ind_levels)
-    write.table(obs_vs_pred, file = file.path(dir_work, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
+    write.table(obs_vs_pred, file = file.path(control_code$dir_run, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
   } else message("No Categorical Variables found for observed vs predicted")
   # Check if utilities meet constraints
   con_matrix <- diag(data_stan$con_sign)
@@ -1099,7 +1104,7 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_wor
   if (sum(bad_ids) > 0){
     message(paste0(sum(bad_ids), " Respondents had reversals from constraints.\n",
                    "Reversals saved to: ", failcon_name))
-    write.table(cbind(header, utilities_r)[bad_ids,], file = file.path(dir_work, failcon_name), sep = ",", na = ".", row.names = FALSE)
+    write.table(cbind(header, utilities_r)[bad_ids,], file = file.path(control_code$dir_run, failcon_name), sep = ",", na = ".", row.names = FALSE)
   } else message(" All respondent mean utilities obey constraints")
 }
 
