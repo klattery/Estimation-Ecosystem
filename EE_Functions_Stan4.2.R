@@ -999,7 +999,7 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, control_code){
   }
   
   # Create pdf of acceptance rate + traceplots 
-  pdf(file = file.path(dir_out, pdf_name),   # The directory you want to save the file in
+  pdf(file = file.path(control_code$dir_run, pdf_name),   # The directory you want to save the file in
       width = 7, # The width of the plot in inches
       height = 5) # The height of the plot in inches
   hist(as.vector(sapply(draws_beta$post_warmup_sampler_diagnostics, function(x) x$accept_stat__)), breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
@@ -1009,7 +1009,7 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, control_code){
   }
   fit_stats <- plot_draws_df(draws= draws_beta_mu, vnames = vnames, ylab = "Mean Beta") # Plots each column
   dev.off()
-  write.table(fit_stats, file = file.path(dir_out, paste0(out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
+  write.table(fit_stats, file = file.path(control_code$dir_run, paste0(control_code$out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
 }
 
 env_stan$obs_vs_pred <- function(wts_obs_pred, cat_vars, predvar_out = "pred_per"){
