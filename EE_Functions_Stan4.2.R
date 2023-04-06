@@ -993,9 +993,11 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, control_code){
     draws_beta_mu[[chain_i]] <- t(aggregate.data.frame(data.frame(x), by = list(rep(1:npar, nresp)), FUN = "mean")[,-1])
   }
   if (control_code$export_draws_means){
-    draws_beta_mu_exp <- do.call(rbind, lapply(1:length(draws_beta_mu), function(i){
+    draws_beta_mu_export <- do.call(rbind, lapply(1:length(draws_beta_mu), function(i){
       result <- cbind(chain = i, iter = 1:nrow(draws_beta_mu[[i]]), draws_beta_mu[[i]])
     }))
+    colnames(draws_beta_mu_export)[3:ncol(draws_beta_mu_export)] <- vnames
+    write.table(draws_beta_mu_export, file = file.path(control_code$dir_run, paste0(control_code$out_prefix,"_draws_beta_means.csv")), sep = ",", na = ".", row.names = FALSE)
   }
   
   # Create pdf of acceptance rate + traceplots 
@@ -1011,6 +1013,7 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, control_code){
   dev.off()
   write.table(fit_stats, file = file.path(control_code$dir_run, paste0(control_code$out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
 }
+
 
 env_stan$obs_vs_pred <- function(wts_obs_pred, cat_vars, predvar_out = "pred_per"){
   ind_levels <- as.data.frame(cat_vars) # in case cat_vars is a vector
