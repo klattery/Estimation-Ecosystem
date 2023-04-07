@@ -926,7 +926,7 @@ env_stan$plot_draws_df <- function(draws, vnames = NULL, ylab = "Draw", pdf_path
     fit_stats$rhat[i] <- round(rhat(x),2)
     fit_stats$ESS[i] <- round(ess_basic(x),1)
     plot(x[,1], type = "l", col = chain_colors[1], ylim = c(min(x), max(x)),
-         xlab = "Sample Iteration", ylab = "Draw",
+         xlab = "Sample Iteration", ylab = ylab,
          main = paste(vnames[i],
                       "| rhat = ", round(rhat(x),2),
                       "| ESS = ", round(ess_basic(x),1)
@@ -941,6 +941,16 @@ env_stan$plot_draws_df <- function(draws, vnames = NULL, ylab = "Draw", pdf_path
   return(fit_stats)
 }
 
+env_stan$check_draws_vector <- function(output_files, stan_vector, vector_labels = NULL, out_dir, out_prefix){
+  # stan_vector is vector/1D array or scalar
+  # vector labels are names for each item in vector, NULL auto assigns
+  draws_stan_var <- read_cmdstan_csv(output_files, variables = stan_vector, format = "draws_list")
+  draws_stan_df <- lapply(draws_stan_var$post_warmup_draws, function(x) do.call(cbind, x))
+  fit_stats_var <- plot_draws_df(draws_stan_df, vector_labels, toupper(stan_vector),
+                                 pdf_path = file.path(out_dir,paste0(out_prefix,"_trace_",stan_vector,".pdf")))
+  write.table(fit_stats_var, file = file.path(out_dir, paste0(out_prefix,"_fit_stats_", stan_vector,".csv")), sep = ",", na = ".", row.names = FALSE)
+} 
+
 env_stan$get_mean_beta <- function(draws_beta){
   nchains <- length(draws_beta$post_warmup_draws)
   result <- matrix(
@@ -951,8 +961,8 @@ env_stan$get_mean_beta <- function(draws_beta){
   return(result)
 }
 
-env_stan$get_covariates <- function(HB_fit, data_stan, dir_out){
-  draws_i_cov_load <- read_cmdstan_csv(HB_fit$output_files(), variables = "i_cov_load", format = "draws_list")
+env_stan$get_covariates <- function(output_files, data_stan, dir_out, out_prefix){
+  draws_i_cov_load <- read_cmdstan_csv(output_files, variables = "i_cov_load", format = "draws_list")
   nchains <- length(draws_i_cov_load$post_warmup_draws)
   result <- matrix(
     Reduce("+",lapply(draws_i_cov_load$post_warmup_draws, function(x) sapply(x, mean)))/nchains,
@@ -1800,7 +1810,6 @@ env_eb$JeffPrior <- function(xvec, data_list, model_list, ID_Var = FALSE, ObsFis
   message(paste0("Min values are: ", paste(minvals, collapse = " ")))
   return(JeffPrior)
 }
-
 
 # Do not attach multiple times -- detach first
 attach(env_code)
