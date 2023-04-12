@@ -403,7 +403,7 @@ env_code$indcode_spec_files <- function(data_in, att_coding, constraints,
     indcode_spec <- setNames(indcode_spec,att_coding[,1,drop = TRUE])
     if(add_none){
       None <- data.frame(None = 0 + apply(data_conjoint[,colnames(data_conjoint) %in% 
-                                                          specs_att_coding[,1]], 1, function(x_row){all(x_row == 0)}))
+                                                          specs_att_coding[,1], drop = FALSE], 1, function(x_row){all(x_row == 0)}))
       if (sum(None$None) >0){
         indcode_spec$None <- usercode1(None, "None")
         indcode_spec$None$message <- c("\nAdded variable None, chosen ",
