@@ -80,6 +80,7 @@ env_code$catcode <- function(kdata, vname, codetype = 3, varout = NULL, reflev =
       colnames(code_matrix) <- varnames
       if (is.null(reflev)){ # set to level with highest shows
         shows <- colSums(code_matrix[newval,TRUE,drop = FALSE])
+        shows[length(shows)] <- shows[length(shows)] - sum(na_vals) # last value has NAs too
         reflev <- match(max(shows), shows)
       } 
       if (codetype %in% c(2, 3))code_matrix <- as.matrix(code_matrix[, -reflev, drop = FALSE]) # ref lev col dropped
