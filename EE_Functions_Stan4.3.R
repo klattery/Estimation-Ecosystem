@@ -397,6 +397,9 @@ env_code$indcode_spec_files <- function(data_in, att_coding, constraints,
       if (att_type == "ORDINAL"){
         indcode_spec[[i]] <- ordcode(data_in, att_name, thermcode = FALSE, con_sign = att_coding[i,3,drop = TRUE])
       }
+      if (att_type == "THERMOMETER"){
+        indcode_spec[[i]] <- ordcode(data_in, att_name, thermcode = TRUE, con_sign = att_coding[i,3,drop = TRUE])
+      }      
       if (att_type == "USERSPECIFIED"){
         indcode_spec[[i]] <- usercode1(data_in, att_name, con_sign = att_coding[i,3,drop = TRUE])
       }
@@ -1073,7 +1076,7 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_run
                                           if (is.null(inv_logit_thresh)){
                                             pred <- U/(1+U)
                                           } else pred <- U/(exp(inv_logit_thresh[t]) + U)
-                                        }                                       
+                                        }
                                         return(pred)
                                       }
     )) # lapply, rbind                                   
