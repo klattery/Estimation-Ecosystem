@@ -996,7 +996,7 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_ru
     " PDF of detailed traceplots:    ", pdf_name,"\n"
   ))
   
-  hist(as.vector(sapply(draws_beta$post_warmup_sampler_diagnostics, function(x) x$accept_stat__)), breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
+  try(hist(as.vector(sapply(draws_beta$post_warmup_sampler_diagnostics, function(x) x$accept_stat__)), breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1)))
   if (export_draws_betas) saveRDS(draws_beta$post_warmup_draws, file.path(dir_run, paste0(out_prefix,"_draws_beta.rds")))
   
   # Get mean of respondent betas for each iteration (like alpha in constrained space)
