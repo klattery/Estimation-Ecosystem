@@ -124,7 +124,7 @@ env_code$catcode <- function(kdata, vname, codetype = 3, varout = NULL, reflev =
     }
   } else prior <- diag(ncol(code_matrix))
   newval[na_vals] <- setna 
-  return(list(outcode = outcode, code_matrix = code_matrix, levels = newval, con_sign = con_vec, vnames = varnames, reflev = reflev, prior = prior, pairs_add = pairs_add))
+  return(list(outcode = outcode, code_matrix = code_matrix, levels = newval, levels_in = labels_in, con_sign = con_vec, vnames = varnames, reflev = reflev, prior = prior, pairs_add = pairs_add))
 }
 
 env_code$remove_implicits<-function(constraints){
