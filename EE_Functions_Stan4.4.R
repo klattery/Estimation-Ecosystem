@@ -434,7 +434,7 @@ env_code$list_to_matrix <- function(klist){
   return(result)  
 } 
 
-env_code$make_codefiles <- function(indcode_spec){
+env_code$make_codefiles <- function(indcode_spec, control_code = .GlobalEnv$control_code){
   # Converts list of codes to matrices:  # code_master, indcode, indprior
   result <- list()
   indcode_list <- indcode_spec[sapply(indcode_spec, length) > 0] # remove NULL elements
@@ -469,15 +469,89 @@ env_code$make_codefiles <- function(indcode_spec){
     row_beg <- row_end + 1 # next row of code_matrix
   }
   colnames(ind_levels) <- ind_levels_names
+  
   result$indcode <- do.call(cbind, lapply(indcode_list, function(x) x$outcode)) # coded variables 
+  code_master <- list_to_matrix(lapply(indcode_list, function(x) x$code_matrix))
+  colnames(code_master) <- colnames(result$indcode) 
+  rownames(code_master) <- do.call("c", lapply(indcode_list, function(x) x$vnames))
+  
+  # Recode cat_var x thermometer if checked
+  cat_var <- control_code$recode_therm$cat_var
+  therm_var <- control_code$recode_therm$therm_var    
+  if (length(cat_var) > 0 && length(therm_var) > 0){
+    att_num <- match(cat_var, att_names, nomatch = 0)
+    goodinput <- TRUE
+    if (att_num == 0) {
+      message(paste0("*** ERROR: Could not find categorical variable ", cat_var, "in specs ***"))
+      goodinput <- FALSE
+    } 
+    therm_data <- ind_coded[, grepl(therm_var, colnames(ind_coded), ignore.case = T)]
+    if (ncol(therm_data) == 0){
+      message(paste0("*** ERROR: Could not find thermometer variable: ", therm_var, "in data ***"))
+      goodinput <- FALSE
+    }
+    ind_level_col <- match(toupper(cat_var), toupper(colnames(ind_levels)), nomatch = 0)
+    if (ind_level_col == 0) {
+      message(paste0("*** ERROR: Could not find categorical variable ", cat_var, "in data ***"))
+      goodinput <- FALSE
+    }
+    therm_cols_change <- match(colnames(therm_data), colnames(code_master))
+    if (sum(is.na(therm_cols_change))>0){
+      message(paste0("*** ERROR: Could not match all data thermometer variables ", colnames(therm_data), "with code master ***"))
+      goodinput <- FALSE
+    }
+    if (goodinput){
+      att_specs <- code_blocks[att_num,]
+      cat_values <- ind_levels[, ind_level_col]
+      cat_values_u <- indcode_spec[[att_num]]$levels_in
+      beg_row <- att_specs[3]
+      row_change <- beg_row
+      for (i in cat_values_u){
+        if (i >0){
+          cat_filter <- (cat_values == i)
+          min_cols <- apply(therm_data[cat_filter,], 2 , min)
+          max_cols <- apply(therm_data[cat_filter,], 2 , max)
+          recodes <- -min_cols * (min_cols == max_cols) * (min_cols != 0) # 0 unless min_cols != 0 and min = max
+          # Change code_master
+          code_master[row_change,therm_cols_change] <- recodes # Changing code_master
+          row_change <- row_change+1    
+        } # end if
+      } # end for
+    } # end if goodinput
+  } # end code_master recode
+  
+  # Create indcode just like we do in Stan
+  result$indcode[] <- 0
+  n_atts <- nrow(code_blocks)
+  lev_col <- 1
+  ## Coding of attributes with levels
+  for (i in 1:n_atts){
+    if (code_blocks[i,5] > 0){ ## already coded, just copy
+      col_beg <- code_blocks[i, 1];
+      col_end <- code_blocks[i, 2];
+      col_coded <- code_blocks[i, 5]; #  beginning of coded column
+      result$indcode[,col_beg:col_end] <- result$indcode[,col_beg:col_end] + ind_coded[,col_coded:(col_coded + col_end - col_beg)];
+    } else {
+      row_beg <- code_blocks[i,3];
+      row_end <- code_blocks[i,4];
+      #int nrows = row_end - row_beg +1;
+      code_att <-  code_master[row_beg:row_end, ]; ## code for this attribute
+      for (n in 1:nrow(result$indcode)){
+        lev <- ind_levels[n,lev_col];
+        if (lev >= 1) result$indcode[n,] = result$indcode[n,] + code_att[lev,];
+      } # end 1:N loop coding
+      lev_col <- lev_col + 1;
+    } # end if  
+  } # end for (att coding)
+  # End creating indcode
+  
   result$ind_coded <- ind_coded
   result$ind_levels <- ind_levels
   result$code_blocks <- code_blocks
   result$con_sign <- do.call("c", lapply(indcode_list, function(x) x$con_sign))
-  result$code_master <- list_to_matrix(lapply(indcode_list, function(x) x$code_matrix))
+  result$code_master <- code_master
   result$indprior <- list_to_matrix(lapply(indcode_list, function(x) x$prior))
-  colnames(result$code_master) <- colnames(result$indcode) 
-  rownames(result$code_master) <- do.call("c", lapply(indcode_list, function(x) x$vnames))
+  
   # This is for the pair constraints
   pair_m <- lapply(indcode_list, function(one_list) {
     if (is.null(one_list$pairs_add)){
@@ -513,9 +587,9 @@ env_code$make_codefiles <- function(indcode_spec){
     if (min(check) <= 0) cat("Could not find initial x0 that satisfies constraints. \nSet indcode_list$x0 manually if using EB")
     result$x0 <- x0
   }
-  
   return(result)
 }
+
 
 env_code$save_codemastercon <- function(indcode_list, dir, out_prefix){
   # Makes a code_master + constraints file and saves it
