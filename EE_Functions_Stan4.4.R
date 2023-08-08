@@ -503,7 +503,7 @@ env_code$make_codefiles <- function(indcode_spec, control_code = .GlobalEnv$cont
     if (goodinput){
       cat("Recoding these thermometer variables\n")
       print(colnames(therm_data))
-      cat(paste0("\nbased on: ", cat_var))
+      cat(paste0("Based on: ", cat_var, "\n"))
       att_specs <- code_blocks[att_num,]
       cat_values <- ind_levels[, ind_level_col]
       cat_values_u <- indcode_spec[[att_num]]$levels_in
