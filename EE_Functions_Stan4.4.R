@@ -482,17 +482,17 @@ env_code$make_codefiles <- function(indcode_spec, control_code = .GlobalEnv$cont
     att_num <- match(cat_var, att_names, nomatch = 0)
     goodinput <- TRUE
     if (att_num == 0) {
-      cat(paste0("*** Recode Slopes ERROR: Could not find categorical variable ", cat_var, "in specs ***\n"))
+      cat(paste0("*** Recode Slopes ERROR: Could not find categorical variable ", cat_var, " in specs ***\n"))
       goodinput <- FALSE
     } 
-    therm_data <- ind_coded[, grepl(therm_var, colnames(ind_coded), ignore.case = T)]
-    if (ncol(therm_data) == 0){
-      cat(paste0("*** Recode Slopes ERROR: Could not find thermometer variable: ", therm_var, "in data ***\n"))
-      goodinput <- FALSE
-    }
     ind_level_col <- match(toupper(cat_var), toupper(colnames(ind_levels)), nomatch = 0)
     if (ind_level_col == 0) {
-      cat(paste0("*** Recode Slopes ERROR: Could not find categorical variable ", cat_var, "in data ***\n"))
+      cat(paste0("*** Recode Slopes ERROR: Could not find categorical variable ", cat_var, " in data ***\n"))
+      goodinput <- FALSE
+    }
+    therm_data <- ind_coded[, grepl(therm_var, colnames(ind_coded), ignore.case = T)]
+    if (ncol(therm_data) == 0){
+      cat(paste0("*** Recode Slopes ERROR: Could not find thermometer variable: ", therm_var, " in data ***\n"))
       goodinput <- FALSE
     }
     therm_cols_change <- match(colnames(therm_data), colnames(code_master))
