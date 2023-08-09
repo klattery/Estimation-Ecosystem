@@ -478,7 +478,7 @@ env_code$make_codefiles <- function(indcode_spec, control_code = .GlobalEnv$cont
   # Recode cat_var x thermometer if checked
   cat_var <- control_code$recode_therm$cat_var
   therm_var <- control_code$recode_therm$therm_var    
-  if (length(cat_var) > 0 && length(therm_var) > 0){
+  if (cat_var != "" && therm_var != ""){
     att_num <- match(cat_var, att_names, nomatch = 0)
     goodinput <- TRUE
     if (att_num == 0) {
