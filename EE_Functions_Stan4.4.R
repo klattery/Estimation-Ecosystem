@@ -1057,7 +1057,8 @@ env_stan$get_covariates <- function(output_files, data_stan, dir_out, out_prefix
 }
 
 env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_run,
-                                          export_draws_betas, export_draws_means){
+                                          export_draws_betas, export_draws_means,
+                                          resp_id = data_stan$resp_id, code_master = data_stan$code_master){
   nchains <- length(draws_beta$post_warmup_draws)
   nresp <- draws_beta$metadata$stan_variable_sizes$beta_ind[2] # num respondents
   npar <- draws_beta$metadata$stan_variable_sizes$beta_ind[1]
@@ -1074,7 +1075,19 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_ru
   ))
   
   try(hist(as.vector(sapply(draws_beta$post_warmup_sampler_diagnostics, function(x) x$accept_stat__)), breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1)))
-  if (export_draws_betas) saveRDS(draws_beta$post_warmup_draws, file.path(dir_run, paste0(out_prefix,"_draws_beta.rds")))
+  if (export_draws_betas){
+    stacked_draws <- do.call(rbind, lapply(1:nchains, function(i){
+      result <- cbind(chain = i,
+                      convert_draws(draws_beta$post_warmup_draws[[i]],
+                                    nresp = nresp,
+                                    P = npar,
+                                    resp_id = resp_id, # Only if stacking
+                                    code_master = code_master, # Only if back coding
+                                    by_row = TRUE, 
+                                    back_code = TRUE, stack = TRUE))
+    }))    
+    saveRDS(stacked_draws, file.path(dir_run, paste0(out_prefix,"_draws_beta.rds")))
+  } 
   
   # Get mean of respondent betas for each iteration (like alpha in constrained space)
   ndraws <- draws_beta$metadata$iter_sampling
@@ -1192,6 +1205,30 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_run
                    "Reversals saved to: ", failcon_name))
     write.table(cbind(header, utilities_r)[bad_ids,], file = file.path(dir_run, failcon_name), sep = ",", na = ".", row.names = FALSE)
   } else message(" All respondent mean utilities obey constraints")
+}
+
+env_stan$convert_draws <- function(draws_chain, # draws for one chain
+                            nresp = data_stan$I,
+                            P = data_stan$P,
+                            resp_id = data_stan$resp_id, # Only if stacking
+                            code_master = data_stan$code_master, # Only if back coding
+                            by_row = TRUE,
+                            back_code = FALSE, 
+                            stack = FALSE) { # Convert list of matrices to one stacked matrix
+    # converts draws for one chain to list of matrices
+    niter <- length(draws_chain[[1]])
+    result <- lapply(1:niter, function(i){
+      util <- matrix(sapply(draws_chain, "[[", i), nresp, P, byrow = by_row)
+      if (back_code) util <- util %*% t(code_master)
+      return (util)           
+    })
+    # result is list of matrices.  Option to stack that list
+    if(stack){
+      result <- do.call(rbind, lapply(1:length(result), function(i){
+        addid <- cbind(iter = i, id = resp_id, result[[i]])
+      }))
+    }
+    return(result)
 }
 
 env_stan$zip_allout <- function(files_dir, out_dir, out_name){
