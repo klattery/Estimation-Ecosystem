@@ -794,8 +794,9 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
                                     force_sumtask_dep1 = TRUE) {
   result <- list(tag = 0, N = 0, P = 0, I = 0, T = 0, dep = 0, ind = 0, sizes = 0,
                  code_master = indcode_list$code_master, n_atts = nrow(indcode_list$code_blocks), code_blocks = indcode_list$code_blocks)
-  sort_order <- order(idtaskdep[, 1], idtaskdep[, 2])
+  sort_order <- order(idtaskdep[, 1], idtaskdep[, 2], -idtaskdep[,3])
   sort_order[!train] <- 0 # Non-training gets order = 0, which removes
+  result$row_in <- (1:length(nrow(idtaskdep)))[sort_order] # Initial order of data with non-training removed
   result$ind <- as.matrix(indcode_list$indcode[sort_order,])
   result$ind_coded <- as.matrix(indcode_list$ind_coded[sort_order,])
   result$ind_levels <- as.matrix(indcode_list$ind_levels[sort_order,])
@@ -832,10 +833,11 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   id_row_end <- result$end[id_task_end]
   result$id_ranges <- cbind(task_beg = id_task_beg, task_end = id_task_end,
                                  row_beg = id_row_beg, row_end = id_row_end, nrows = id_row_end - id_row_beg + 1)
-
+  result$npos_m1 <- aggregate(dep>0, list(idtask_r), sum)- 1
   if (!is.null(other_data)) {
     result$other_data <- as.matrix(other_data)[sort_order,]
   } else result$other_data <- 0
+  
   # Friendly output
   cat("Prepared data_stan with coded data and constraints\n")
   cat(paste0("    ",length(resp_id)), " Respondents\n")
