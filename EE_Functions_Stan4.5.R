@@ -833,7 +833,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   id_row_end <- result$end[id_task_end]
   result$id_ranges <- cbind(task_beg = id_task_beg, task_end = id_task_end,
                                  row_beg = id_row_beg, row_end = id_row_end, nrows = id_row_end - id_row_beg + 1)
-  result$npos_m1 <- aggregate(dep>0, list(idtask_r), sum)- 1
+  result$npos_m1 <- aggregate(dep>0, list(idtask_r), sum)[,2]- 1
   if (!is.null(other_data)) {
     result$other_data <- as.matrix(other_data)[sort_order,]
   } else result$other_data <- 0
