@@ -796,7 +796,9 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
                  code_master = indcode_list$code_master, n_atts = nrow(indcode_list$code_blocks), code_blocks = indcode_list$code_blocks)
   sort_order <- order(idtaskdep[, 1], idtaskdep[, 2], -idtaskdep[,3])
   sort_order[!train] <- 0 # Non-training gets order = 0, which removes
-  result$row_in <- (1:nrow(idtaskdep))[sort_order] # Initial order of data with non-training removed
+  row_in <- (1:nrow(idtaskdep))[sort_order] # Initial order of data with non-training removed
+  row_in[row_in < 0] <- 0 # If all 0's then this is fine
+  result$row_in <- row_in
   result$ind <- as.matrix(indcode_list$indcode[sort_order,])
   result$ind_coded <- as.matrix(indcode_list$ind_coded[sort_order,])
   result$ind_levels <- as.matrix(indcode_list$ind_levels[sort_order,])
