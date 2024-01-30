@@ -1194,15 +1194,16 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_run
   write.table(cbind(header, utilities_r), file = file.path(dir_run, util_name), sep = ",", na = ".", row.names = FALSE)
   
   pred_all_export <- cbind(data_stan$idtask, wts = row_weights, dep = data_stan$dep, pred = pred_all)
+  if (ncol(data_stan$ind_levels) >0){
+    obs_vs_pred <- obs_vs_pred(pred_all_export[,3:5], data_stan$ind_levels)
+    write.table(obs_vs_pred, file = file.path(dir_run, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
+  } else message("No Categorical Variables found for observed vs predicted")
   if ("row_in" %in% names(data_stan)){
     pred_all_export <- cbind(row_in = data_stan$row_in, pred_all_export)
     pred_all_export <- pred_all_export[order(data_stan$row_in),]
   } else pred_all_export <- cbind(row_in = NA, pred_all_export)
   write.table(pred_all_export, file = file.path(dir_run, pred_name), sep = ",", na = ".", row.names = FALSE)
-  if (ncol(data_stan$ind_levels) >0){
-    obs_vs_pred <- obs_vs_pred(pred_all_export[,4:6], data_stan$ind_levels)
-    write.table(obs_vs_pred, file = file.path(dir_run, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
-  } else message("No Categorical Variables found for observed vs predicted")
+
   # Check if utilities meet constraints
   con_matrix <- diag(data_stan$con_sign)
   con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], data_stan$paircon_matrix)
@@ -1382,18 +1383,18 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
   message(paste0("\nEB point estimates       : ",util_eb_name))
   colnames(preds) <- c("id","task","wts", "dep","pred_eb")
   preds_name <- paste0(out_prefix,"_preds_EB.csv")
+
+  obs_vs_pred <- obs_vs_pred(preds[,3:5], data_stan$ind_levels)
+  obs_vs_pred_name <- paste0(out_prefix,"_obs_vs_pred_EB.csv")
+  write.table(obs_vs_pred, file = file.path(dir_work, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
+  message(paste0("EB Observed vs Predicted: ", obs_vs_pred_name))  
+  
   if ("row_in" %in% names(data_stan)){
     preds <- cbind(row_in = data_stan$row_in, preds)
     preds <- preds[order(data_stan$row_in),]
   } else preds <- cbind(row_in = NA, preds)
-  
   write.table(preds, file = file.path(dir_work, preds_name), sep = ",", na = ".", row.names = FALSE)  
   message(paste0("EB predictions for data : ", preds_name))
-  
-  obs_vs_pred <- obs_vs_pred(preds[,4:6], data_stan$ind_levels)
-  obs_vs_pred_name <- paste0(out_prefix,"_obs_vs_pred_EB.csv")
-  write.table(obs_vs_pred, file = file.path(dir_work, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
-  message(paste0("EB Observed vs Predicted: ", obs_vs_pred_name))  
 }
 
 env_eb$numder_2 <- function(x, pos, delta = .01){
