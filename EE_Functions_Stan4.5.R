@@ -1194,6 +1194,10 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_run
   write.table(cbind(header, utilities_r), file = file.path(dir_run, util_name), sep = ",", na = ".", row.names = FALSE)
   
   pred_all_export <- cbind(data_stan$idtask, wts = row_weights, dep = data_stan$dep, pred = pred_all)
+  if ("row_in" %in% names(data_stan)){
+    pred_all_export <- cbind(row_in = data_stan$row_in, pred_all_export)
+    pred_all_export <- pred_all_export[order(data_stan$row_in),]
+  }
   write.table(pred_all_export, file = file.path(dir_run, pred_name), sep = ",", na = ".", row.names = FALSE)
   if (ncol(data_stan$ind_levels) >0){
     obs_vs_pred <- obs_vs_pred(pred_all_export[,3:5], data_stan$ind_levels)
