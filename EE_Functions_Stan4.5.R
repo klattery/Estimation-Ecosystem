@@ -506,7 +506,8 @@ env_code$make_codefiles <- function(indcode_spec, control_code = .GlobalEnv$cont
       cat(paste0("Based on: ", cat_var, "\n\n"))
       att_specs <- code_blocks[att_num,]
       cat_values <- ind_levels[, ind_level_col]
-      cat_values_u <- indcode_spec[[att_num]]$levels_in
+      #cat_values_u <- indcode_spec[[att_num]]$levels_in
+      cat_values_u <- sort(unique(cat_values))
       beg_row <- att_specs[3]
       row_change <- beg_row
       for (i in cat_values_u){
