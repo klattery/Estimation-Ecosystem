@@ -381,7 +381,7 @@ env_code$indcode_spec_files <- function(data_in, att_coding, constraints,
   constraints <- remove_implicits(constraints) 
   if (check_atts_constraints(data_in, att_coding,constraints)){
     catcode_types <- c("INDICATOR", "DUMMY","EFFECT","EFFECTS","CATEGORICAL","NOMINAL")
-    indcode_spec <- list(nrow(att_coding))
+    indcode_spec <- vector("list", length = nrow(att_coding))
     
     for (i in 1:nrow(att_coding)){
       att_name <- att_coding[i,1,drop = TRUE]
