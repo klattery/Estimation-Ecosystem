@@ -906,8 +906,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
     x0 = x_initial$par,
     threads_rec = min(max(1,(detectCores() - 2)/2), round(.5 + result$T/500), round(.5 + result$I/16)),
     idtask = idtask, idtask_r = idtask_r,
-    resp_id = resp_id, match_id = match_id,
-    other_data = other_data))) 
+    resp_id = resp_id, match_id = match_id))) 
 }  
 
 env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
