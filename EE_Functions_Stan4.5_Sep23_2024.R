@@ -1215,77 +1215,6 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_run
   } else message(" All respondent mean utilities obey constraints")
 }
 
-env_stan$process_dualtypes <- function(data_stan, utilities, util_thresh, scale, lb, range, out_prefix, dir_run, ind_thresh = NULL){
-  # Compute predictions
-  row_weights <- data_stan$wts[data_stan$idtask_r] # convert task weights to row weights
-  task_type <- data_stan$task_type
-  row_task_type <- task_type[data_stan$idtask_r] # Carry task_type to row
-  choice_tasks <- row_task_type == 1
-  if (is.null(ind_thresh)) ind_thresh <- as.matrix(rep(1,data_stan$N))
-  pred_all <- do.call(rbind, lapply(1:data_stan$T,
-                                    function(t){
-                                      if (task_type[t] == 1){ # MNL
-                                        U <- exp(data_stan$ind[data_stan$start[t]:data_stan$end[t],] %*%
-                                                   utilities[data_stan$task_individual[t],])
-                                        pred <- U/sum(U)
-                                      }
-                                      if (task_type[t] == 2){ # Rating = lb + range * Inv Logit
-                                        util <- scale[data_stan$task_individual[t]] * data_stan$ind[data_stan$start[t]:data_stan$end[t],] %*%
-                                          utilities[data_stan$task_individual[t],]
-                                        thresh <- ind_thresh[data_stan$start[t]:data_stan$end[t],] %*%
-                                          (util_thresh[data_stan$task_individual[t],])
-                                        pred <- lb + range/(1+ exp(thresh - util)) # = lb + range * e^util/(e^util + e^thresh)
-                                        
-                                      }
-                                      return(pred)
-                                    }
-  )) # lapply, rbind                                   
-  
-  utilities_r <- cbind(utilities %*% t(data_stan$code_master), beta_scale, utilities_thresh)
-  util_name <- paste0(out_prefix,"_utilities_r.csv")
-  pred_name <- paste0(out_prefix,"_preds_meanpt.csv")
-  failcon_name <- paste0(out_prefix,"_utilities_failcon.csv")
-  obs_vs_pred_name <- paste0(out_prefix,"_obs_vs_pred.csv")
-  
-  LL_id <- rowsum(log(pred_all) * data_stan$dep * row_weights * choice_tasks, data_stan$match_id)
-  sum_wts <- rowsum(data_stan$dep * row_weights * choice_tasks, data_stan$match_id)
-  sum_wts[sum_wts == 0] <- 1
-  SUM_AE_id <- rowsum(abs(pred_all - data_stan$dep) * row_weights * (!choice_tasks), data_stan$match_id)
-  sum_wts_2 <- rowsum(row_weights * (!choice_tasks), data_stan$match_id)
-  sum_wts_2[sum_wts_2 == 0] <- 1
-  
-  header <- data.frame(id = data_stan$resp_id, rlh = exp(LL_id/sum_wts), MAE_rate = SUM_AE_id/sum_wts_2)
-  message(paste0(
-    "Saving: \n",
-    " Respondent mean utilities: ", util_name, "\n",
-    " Predictions for data     : ", pred_name, "\n",
-    " Observed vs Predicted    : ", obs_vs_pred_name 
-  ))
-  
-  write.table(cbind(header, utilities_r), file = file.path(dir_run, util_name), sep = ",", na = ".", row.names = FALSE)
-  
-  pred_all_export <- cbind(data_stan$idtask, wts = row_weights, dep = data_stan$dep, pred = pred_all)
-  if (ncol(data_stan$ind_levels) >0){
-    obs_vs_pred <- obs_vs_pred(pred_all_export[choice_tasks,3:5], data_stan$ind_levels[choice_tasks,])
-    write.table(obs_vs_pred, file = file.path(dir_run, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
-  } else message("No Categorical Variables found for observed vs predicted")
-  if ("row_in" %in% names(data_stan)){
-    pred_all_export <- cbind(row_in = data_stan$row_in, pred_all_export)
-    pred_all_export <- pred_all_export[order(data_stan$row_in),]
-  } else pred_all_export <- cbind(row_in = NA, pred_all_export)
-  write.table(pred_all_export, file = file.path(dir_run, pred_name), sep = ",", na = ".", row.names = FALSE)
-  
-  # Check if utilities meet constraints
-  con_matrix <- diag(data_stan$con_sign)
-  con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], data_stan$paircon_matrix)
-  bad_ids <- rowSums(((utilities %*% t(con_matrix)) < 0)) > 0
-  if (sum(bad_ids) > 0){
-    message(paste0(sum(bad_ids), " Respondents had reversals from constraints.\n",
-                   "Reversals saved to: ", failcon_name))
-    write.table(cbind(header, utilities_r)[bad_ids,], file = file.path(dir_run, failcon_name), sep = ",", na = ".", row.names = FALSE)
-  } else message(" All respondent mean utilities obey constraints")
-}
-
 env_stan$convert_draws <- function(draws_chain, # draws for one chain
                             nresp = data_stan$I,
                             P = data_stan$P,
@@ -2011,7 +1940,6 @@ env_eb$JeffPrior <- function(xvec, data_list, model_list, ID_Var = FALSE, ObsFis
   message(paste0("Min values are: ", paste(minvals, collapse = " ")))
   return(JeffPrior)
 }
-
 
 # Do not attach multiple times -- detach first
 attach(env_code)
