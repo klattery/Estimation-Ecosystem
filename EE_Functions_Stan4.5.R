@@ -1005,8 +1005,8 @@ env_stan$plot_draws_df <- function(draws, vnames = NULL, ylab = "Draw", pdf_path
     x <- sapply(1:length(draws), function(chain){
       draws[[chain]][,i]     
     })
-    fit_stats$mean[i] <- round(mean(x), 2)
-    fit_stats$sd[i] <- round(sd(x),2)
+    fit_stats$mean[i] <- round(mean(x), 5)
+    fit_stats$sd[i] <- round(sd(x),5)
     fit_stats$rhat[i] <- round(rhat(x),2)
     fit_stats$ESS[i] <- round(ess_basic(x),1)
     plot(x[,1], type = "l", col = chain_colors[1], ylim = c(min(x), max(x)),
