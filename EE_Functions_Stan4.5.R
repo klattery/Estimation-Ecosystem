@@ -127,37 +127,86 @@ env_code$catcode <- function(kdata, vname, codetype = 3, varout = NULL, reflev =
   return(list(outcode = outcode, code_matrix = code_matrix, levels = newval, levels_in = labels_in, con_sign = con_vec, vnames = varnames, reflev = reflev, prior = prior, pairs_add = pairs_add))
 }
 
+#### Kees new Code ###
 env_code$remove_implicits<-function(constraints){
   if (nrow(constraints) == 0){
-    result <- constraints
+    new_constraints <- constraints
   } else {
     result <- NULL
+    
     constraints <- data.frame(constraints) # Tibble does not work
-    for (i in 1:nrow(constraints)){
-      if(!(isImplicit(constraints, i, constraints[i,1],constraints[i,2], constraints[i,3]))){
-        result<-rbind(result,constraints[i,])
+    atts<-unique(constraints[,1])
+    new_constraints<-c()
+    
+    for(att in atts){
+      attcons<-constraints[constraints[,1]==att,-1]
+      orig_prohibs<-create_zero_ones(attcons)
+      new_prohibs<-check_implicits(orig_prohibs)
+      new_constraints<-rbind(new_constraints,cbind(att,new_prohibs))
+    }
+    
+  }
+  colnames(new_constraints)<-colnames(constraints)
+  new_constraints<-data.frame(new_constraints)
+  return(new_constraints)
+}
+
+env_code$create_zero_ones<-function(attcons){
+  
+  prohibs<-diag(max(attcons))
+  for (con in 1:nrow(attcons)){
+    prohibs[attcons[con,1],attcons[con,2]]=1
+  }
+  prevsum=0
+  newsum=sum(prohibs)
+  while(newsum!=prevsum){
+    prevsum=newsum
+    prohibs<-prohibs %*% prohibs
+    prohibs[prohibs>0]<-1
+    newsum=sum(prohibs)
+  }  
+  diag(prohibs)<-0
+  return (prohibs)
+}
+env_code$zero_one_to_lev<-function(prohibs){
+  nlev<-ncol(prohibs)
+  result<-c()
+  for (rij in 1:nlev){
+    for (col in 1:nlev){
+      if (prohibs[rij,col]==1){
+        result<-rbind(result,c(rij,col))
       }
     }
   }
   return(result)
 }
 
-env_code$isImplicit <-function(constraints,conrow, att, A, B){
-  nrofcons <- nrow(constraints)
-  vlag <- FALSE
-  for (i in 1:nrofcons){
-    if(constraints[i, 1] == att && constraints[i, 3] == B && i != conrow){ 
-      bnew <- constraints[i, 2]
-      if(A == bnew){
+env_code$check_implicits<-function(orig_prohibs){
+  
+  nlev<-ncol(orig_prohibs)
+  new_prohibs<-orig_prohibs
+  
+  for (rij in 1:nlev){
+    for (col in 1:nlev){
+      if (orig_prohibs[rij, col] == 1){
+        rij2 = col
         vlag <- TRUE
-        return(vlag)
-      } else {
-        vlag <- isImplicit(constraints,i, att, A, bnew)
-      } 
+        if (sum(orig_prohibs[rij2,])==0) vlag<-FALSE
+        for (col2 in 1:nlev){
+          if (orig_prohibs[rij2, col2] == 1 && orig_prohibs[rij, col2] == 0){
+            vlag <-FALSE
+            break
+          }
+        }
+        if (vlag){
+          new_prohibs[rij, orig_prohibs[rij2, ]==1] <- 0
+        }
+      }
     }
   }
-  return(vlag)
+  return(zero_one_to_lev(new_prohibs))
 }
+##### End Kees new code ############
 
 env_code$ordinal_chain <-function(constraints){
   result <- list()
