@@ -919,14 +919,19 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
     } else cat("Optional weights variable not found in covariates data.  All data weighted at 1\n")
   }
   
-  # Select holdouts by setting wt = 0
+  # Select # holdouts corresponding to option > 0
+  result$holdout <- rep(0, length(result$task_individual)) 
   if (holdouts >0){
     for (i in 1:nrow(result$id_ranges)){
       task_set <- c(result$id_ranges[i,1]:result$id_ranges[i,2])
       if (length(task_set) > holdouts){
         picks <- sample(task_set,holdouts)
-        result$wts[picks] <- 0
+        result$holdout[picks] <- 0
       }
+    }
+  } else {
+    for (t in 1:result$T){
+      if (idtask[result$start[t],2] < 0) {holdout[t] <- 1}
     }
   }
   

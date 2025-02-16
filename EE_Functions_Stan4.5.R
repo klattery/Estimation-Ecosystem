@@ -841,7 +841,8 @@ env_modfun$logpdf_mvt <- function(beta, alpha, cov_inv, df = 100) {
 env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
                                     data_cov, specs_cov_coding,
                                     check_collinearity = FALSE, other_data = NULL,
-                                    force_sumtask_dep1 = TRUE) {
+                                    force_sumtask_dep1 = TRUE,
+                                    holdouts = 0) {
   result <- list(tag = 0, N = 0, P = 0, I = 0, T = 0, dep = 0, ind = 0, sizes = 0,
                  code_master = indcode_list$code_master, n_atts = nrow(indcode_list$code_blocks), code_blocks = indcode_list$code_blocks)
   sort_order <- order(idtaskdep[, 1], idtaskdep[, 2], -idtaskdep[,3])
@@ -916,7 +917,18 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
     if (toupper(colnames(data_cov)[2]) %in% c("WTS","WT","WEIGHTS","WEIGHT")){
       result$wts <- make_wts(data_cov, resp_id)[result$task_individual]
     } else cat("Optional weights variable not found in covariates data.  All data weighted at 1\n")
-  } 
+  }
+  
+  # Select holdouts by setting wt = 0
+  if (holdouts >0){
+    for (i in 1:nrow(result$id_ranges)){
+      task_set <- c(result$id_ranges[i,1]:result$id_ranges[i,2])
+      if (length(task_set) > holdouts){
+        picks <- sample(task_set,holdouts)
+        result$wts[picks] <- 0
+      }
+    }
+  }
   
   # Check for collinearity
   if (check_collinearity){
