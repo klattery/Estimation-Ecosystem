@@ -926,7 +926,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
       task_set <- c(result$id_ranges[i,1]:result$id_ranges[i,2])
       if (length(task_set) > holdouts){
         picks <- sample(task_set,holdouts)
-        result$holdout[picks] <- 0
+        result$holdout[picks] <- 1
       }
     }
   } else {
