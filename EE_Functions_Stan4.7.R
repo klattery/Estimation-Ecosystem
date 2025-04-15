@@ -1246,11 +1246,14 @@ env_stan$predict_fromutil <- function(data_stan, utilities, task_type = NULL, in
 env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_run,
                                        task_type = NULL, inv_logit_thresh = NULL){
   # Compute predictions
-  row_weights <- data_stan$wts[data_stan$idtask_r] # convert task weights to row weights
+  row_weights <- data_stan$wts[data_stan$idtask_r] # April 2025 task weights * holdout -> row weights
+  row_holdout <- data_stan$holdout[data_stan$idtask_r]
+  n_holdouts <- sum(data_stan$holdout)
   pred_all <- predict_fromutil(data_stan, utilities, task_type, inv_logit_thresh)   
   utilities_r <- utilities %*% t(data_stan$code_master)
   util_name <- paste0(out_prefix,"_utilities_r.csv")
   pred_name <- paste0(out_prefix,"_preds_meanpt.csv")
+  fit_name <- paste0(out_prefix,"_Hit_LL.csv")
   failcon_name <- paste0(out_prefix,"_utilities_failcon.csv")
   obs_vs_pred_name <- paste0(out_prefix,"_obs_vs_pred.csv")
   
@@ -1262,14 +1265,15 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_run
     "Saving: \n",
     " Respondent mean utilities: ", util_name, "\n",
     " Predictions for data     : ", pred_name, "\n",
-    " Observed vs Predicted    : ", obs_vs_pred_name 
+    " Observed vs Predicted    : ", obs_vs_pred_name, "\n",
+    " Hit Rate and LogLike     : ", fit_name
   ))
   
   write.table(cbind(header, utilities_r), file = file.path(dir_run, util_name), sep = ",", na = ".", row.names = FALSE)
   
-  pred_all_export <- cbind(data_stan$idtask, wts = row_weights, dep = data_stan$dep, pred = pred_all)
+  pred_all_export <- cbind(data_stan$idtask, holdout = row_holdout, wt = row_weights, dep = data_stan$dep, pred = pred_all)
   if (ncol(data_stan$ind_levels) >0){
-    obs_vs_pred <- obs_vs_pred(pred_all_export[,3:5], data_stan$ind_levels)
+    obs_vs_pred <- obs_vs_pred(pred_all_export[,4:6], data_stan$ind_levels)
     write.table(obs_vs_pred, file = file.path(dir_run, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
   } else message("No Categorical Variables found for observed vs predicted")
   if ("row_in" %in% names(data_stan)){
@@ -1277,7 +1281,7 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_run
     pred_all_export <- pred_all_export[order(data_stan$row_in),]
   } else pred_all_export <- cbind(row_in = NA, pred_all_export)
   write.table(pred_all_export, file = file.path(dir_run, pred_name), sep = ",", na = ".", row.names = FALSE)
-
+  
   # Check if utilities meet constraints
   con_matrix <- diag(data_stan$con_sign)
   con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], data_stan$paircon_matrix)
@@ -1287,6 +1291,9 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_run
                    "Reversals saved to: ", failcon_name))
     write.table(cbind(header, utilities_r)[bad_ids,], file = file.path(dir_run, failcon_name), sep = ",", na = ".", row.names = FALSE)
   } else message(" All respondent mean utilities obey constraints")
+  fit_hit_LL <- hit_rate_LL(pred_all_export ,col_id = 2,col_task = 3, col_dep = 6,
+                            col_pred = 7, col_split = 4, col_wts = 5)
+  write.table(fit_hit_LL, file = file.path(dir_run, fit_name), sep = ",", na = ".", row.names = FALSE)      
 }
 
 env_stan$process_dualtypes <- function(data_stan, utilities, util_thresh, scale, lb, range, out_prefix, dir_run, ind_thresh = NULL){
