@@ -883,7 +883,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   id_row_beg <- result$start[id_task_beg]
   id_row_end <- result$end[id_task_end]
   result$id_ranges <- cbind(task_beg = id_task_beg, task_end = id_task_end,
-                                 row_beg = id_row_beg, row_end = id_row_end, nrows = id_row_end - id_row_beg + 1)
+                            row_beg = id_row_beg, row_end = id_row_end, nrows = id_row_end - id_row_beg + 1)
   result$npos_m1 <- aggregate(dep>0, list(idtask_r), sum)[,2]- 1
   result$npos_m1[result$npos_m1 < 0] <- 0 # In case all deps for task are 0
   if (!is.null(other_data)) {
@@ -920,20 +920,18 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   }
   
   # Select # holdouts corresponding to option > 0
-  result$holdout <- rep(0, length(result$task_individual)) 
+  result$task_idtask <- idtask[result$start,]
+  result$holdout <- as.integer(result$task_idtask[,2] < 0) # negative task numbers are holdouts
   if (holdouts >0){
     for (i in 1:nrow(result$id_ranges)){
-      task_set <- c(result$id_ranges[i,1]:result$id_ranges[i,2])
-      if (length(task_set) > holdouts){
-        picks <- sample(task_set,holdouts)
+      task_set <- c(result$id_ranges[i,1]:result$id_ranges[i,2]) # tasks for resp
+      holds_left <- holdouts - sum(result$holdout[task_set] == 1) # num holdouts still to pick
+      if (holds_left > 0){
+        picks <- sample(task_set, holds_left, prob = 1 - result$holdout[task_set])
         result$holdout[picks] <- 1
       }
     }
-  } else {
-    for (t in 1:result$T){
-      if (idtask[result$start[t],2] < 0) {holdout[t] <- 1}
-    }
-  }
+  } 
   
   # Check for collinearity
   if (check_collinearity){
@@ -974,6 +972,8 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
     idtask = idtask, idtask_r = idtask_r,
     resp_id = resp_id, match_id = match_id))) 
 }  
+
+  
 
 env_stan$check_collinear <- function(x, add_int = TRUE, vnames = NULL){
   #add_int adds an intercept which we usually want
