@@ -1296,6 +1296,55 @@ env_stan$process_utilities <- function(data_stan, utilities, out_prefix, dir_run
   write.table(fit_hit_LL, file = file.path(dir_run, fit_name), sep = ",", na = ".", row.names = FALSE)      
 }
 
+env_stan$hit_rate_LL <- function(data_wpreds, col_id, col_task, col_dep, col_pred, col_split = NULL, col_wts = NULL){
+  # Note task_wts are the weights of each 
+  ksplit <- split(data_wpreds, data_wpreds[,c(col_task, col_id)], drop = TRUE) # No empty elements
+  fit_tasks <- data.frame(do.call(rbind, lapply(ksplit, function(x){ # wts for id x task
+    if (is.null(col_wts)){
+      wt <- 1
+    } else {
+      wt <- mean(x[,col_wts])
+    }
+    if (is.null(col_split)){
+      split <- 1
+    } else {
+      split1 <- min(x[,col_split])
+      split2 <- max(x[,col_split])
+      split <- NA
+      if (split1 == split2) split <- split1
+    }
+    preds <- x[,col_pred, drop = TRUE] # Force vector
+    dep <- x[,col_dep, drop = TRUE]
+    row_max <- which(preds == max(preds, na.rm = TRUE)) # Allows for ties
+    hit <- mean(dep[row_max]) 
+    LL <- sum(log(preds) * dep)
+    result <- c(split, wt, hit, LL)
+    return(result)
+  })))
+  knames <- colnames(data_wpreds)
+  split_name <- "Group"
+  if (!is.null(col_split)) split_name <- knames[col_split]
+  colnames(fit_tasks) <- c(split_name, "wt", "hit", "LL")  
+  
+  split_group <- split(fit_tasks, fit_tasks[,1], drop = TRUE)
+  fit_agg <- data.frame(do.call(rbind, lapply(split_group, function(x){
+    sum_wts <- sum(x[,2])
+    hit_rate <- sum(x[,3] * x[,2])/sum_wts
+    LL_mean <- sum(x[,4] * x[,2])/sum_wts
+    rlh <- exp(LL_mean)
+    result <- c(x[1,1],nrow(x),sum_wts,hit_rate, LL_mean, rlh)
+    return(result)
+  })))
+  colnames(fit_agg) <- c(split_name,"num_tasks", "sum_wts","hit_rate","LL_mean", "RLH")
+  
+  # cat("Total of ", length(ksplit), " tasks\n")
+  # cat("Used the following for\n")
+  # cat(paste("  defining tasks  :", knames[col_id], knames[col_task],"\n"))
+  # cat(paste("  observed vs pred:", knames[col_dep], knames[col_pred],"\n"))
+  # print.data.frame(fit_agg, row.names = FALSE)
+  return(fit_agg)
+}
+
 env_stan$process_dualtypes <- function(data_stan, utilities, util_thresh, scale, lb, range, out_prefix, dir_run, ind_thresh = NULL){
   # Compute predictions
   row_weights <- data_stan$wts[data_stan$idtask_r] # convert task weights to row weights
