@@ -871,7 +871,8 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   dep[is.na(dep)] <- 0
   result$dep <- dep
   result$N <- nrow(result$ind); result$P <- ncol(result$ind);
-  result$I <- length(resp_id); result$T <- max(idtask_r); 
+  result$I <- length(resp_id); result$T <- max(idtask_r);
+  result$task_scale_group <- rep(1, result$T)
   
   # Add Stan ragged array stuff
   result$end <- c(which(diff(idtask_r)!=0), length(idtask_r))
