@@ -1875,10 +1875,13 @@ env_stan$process_HB <- function(data_stan, draws_beta, out_prefix, dir_run, prob
   
   fit_hit_LL <- hit_rate_LL(pred_all_export ,col_id = 2,col_task = 3, col_dep = 6,
                             col_pred = 7, col_split = 4, col_wts = 5)
+  fit_hit_LL <- cbind(type = "MeanPts", data.frame(fit_hit_LL))
   fit_hit_LL2 <- hit_rate_LL(pred_all_export ,col_id = 2,col_task = 3, col_dep = 6,
                              col_pred = 8, col_split = 4, col_wts = 5)
-  fit_hit_LL <- data.frame(cbind(type = c("MeanPts_In", "MeanPts_Hold", "Draws_In", "Draws_Out"), rbind(fit_hit_LL,fit_hit_LL2)))
+  fit_hit_LL2 <- cbind(type = "Draws", data.frame(fit_hit_LL2))
+  fit_hit_LL <- rbind(fit_hit_LL,fit_hit_LL2)
   write.table(fit_hit_LL, file = file.path(dir_run, fit_name), sep = ",", na = ".", row.names = FALSE) 
+  write.table(scale_factor_mean, file = file.path(dir_run, paste0(out_prefix,"_scale_factor_mean.csv")), sep = ",", na = ".", row.names = FALSE) 
   
   # Check if utilities meet constraints
   con_matrix <- diag(data_stan$con_sign)
