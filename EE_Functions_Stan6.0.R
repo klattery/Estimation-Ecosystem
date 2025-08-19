@@ -1738,9 +1738,8 @@ env_stan$LC_est <- function(data_stan, data_model, out_folder, stanout, out_pref
     ))
     print(as.data.frame(LC_LL))
     write.table(LC_probsno0, file = file.path(dir_run, paste0(out_prefix,"_LC_probs.csv")), sep = ",", na = ".", row.names = FALSE)
-    saveRDS(LC_fit, file.path(dir_run, paste0(out_prefix, "_LC_fit.rds")))
-    
     result <- list(LC_LL = LC_LL, LC_betas = LC_betas, LC_probs = LC_probsno0, LC_probs0 = LC_probs0, LC_pred = LC_pred, LC_prob_good = 1 - apply(LC_probs0[,-1],1,min))
+    saveRDS(result, file.path(dir_run, paste0(out_prefix, "_LC_fit.rds")))
   } else result <- NULL
   return(result)
 }
