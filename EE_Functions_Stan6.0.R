@@ -1862,8 +1862,8 @@ env_stan$process_HB <- function(data_stan, draws_beta, out_prefix, dir_run, prob
   
   pred_all_export <- cbind(data_stan$idtask, holdout = row_holdout, wt = row_weights, dep = data_stan$dep, pred_pt = pred_all[,1], pred_draws = pred_all[,2])
   if (ncol(data_stan$ind_levels) >0){
-    obs_vs_pred <- obs_vs_pred(pred_all_export[,5:7], data_stan$ind_levels)
-    obs_vs_pred2 <- obs_vs_pred(pred_all_export[,c(5,6,8)], data_stan$ind_levels)
+    obs_vs_pred <- obs_vs_pred(pred_all_export[,4:6], data_stan$ind_levels)
+    obs_vs_pred2 <- obs_vs_pred(pred_all_export[,c(4,5,7)], data_stan$ind_levels)
     obs_vs_pred$pred_per_draws <- obs_vs_pred2$pred_per
     write.table(obs_vs_pred, file = file.path(dir_run, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
   } else message("No Categorical Variables found for observed vs predicted")
