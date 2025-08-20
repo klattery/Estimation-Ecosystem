@@ -842,7 +842,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
                                     data_cov, specs_cov_coding,
                                     check_collinearity = FALSE, other_data = NULL,
                                     force_sumtask_dep1 = TRUE,
-                                    holdouts = 0) {
+                                    holdouts = 0, seed = NULL) {
   result <- list(tag = 0, N = 0, P = 0, I = 0, T = 0, dep = 0, ind = 0, sizes = 0,
                  code_master = indcode_list$code_master, n_atts = nrow(indcode_list$code_blocks), code_blocks = indcode_list$code_blocks)
   sort_order <- order(idtaskdep[, 1], idtaskdep[, 2], -idtaskdep[,3])
@@ -924,6 +924,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   result$task_idtask <- idtask[result$start,]
   result$holdout <- as.integer(result$task_idtask[,2] < 0) # negative task numbers are holdouts
   if (holdouts >0){
+    if (!is.null(seed)) set.seed(seed)
     for (i in 1:nrow(result$id_ranges)){
       task_set <- c(result$id_ranges[i,1]:result$id_ranges[i,2]) # tasks for resp
       holds_left <- holdouts - sum(result$holdout[task_set] == 1) # num holdouts still to pick
