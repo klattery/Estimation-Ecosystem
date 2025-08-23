@@ -2023,7 +2023,7 @@ env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
     write.table(cbind(header, utilities_r)[bad_ids,], file = file.path(dir_run, failcon_name), sep = ",", na = ".", row.names = FALSE)
   } else message(" All respondent mean utilities obey constraints")
   
-  return(result = list(utilities = utilities, fit_id = fit_id, pred_all = pred_all, scale_factor_draws = scale_factor, scale_factor_pts = scale_factor_mean, beta_draws = beta_draws))
+  return(result = list(utilities = utilities, fit_id = fit_id, pred_all = pred_all, scale_factor_draws = scale_factor, scale_factor_pts = scale_factor_mean, draws_beta = draws_beta))
   } else message("Stan Estimation Did not Finish")
 }
 
