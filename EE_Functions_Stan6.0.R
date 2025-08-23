@@ -1921,6 +1921,7 @@ env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
     if (max(data_stan$task_scale_group > 1)) check_draws_vector(meta_data$output_files, "z_log_scale_xref",
                                                                 data_stan$resp_id, control_code$dir_run, control_code$out_prefix,makepdf = ("scale_factor" %in% control_code$makepdf))
     out_prefix <- control_code$out_prefix
+    dir_run <- control_code$dir_run
     P <- data_stan$P
     row_weights <- data_stan$wts[data_stan$idtask_r] 
     row_holdout <- data_stan$holdout[data_stan$idtask_r]
