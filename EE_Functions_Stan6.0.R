@@ -1792,7 +1792,7 @@ env_stan$predict_task_base <- function(t, ind, utilities, scale_factor, task_typ
   return(pred) # For draws this returns n_alt x n_draws
 }
 
-env_stan$process_HB <- function(data_stan, draws_beta, out_prefix, dir_run, prob_bad = NULL,
+env_stan$process_HB_old <- function(data_stan, draws_beta, out_prefix, dir_run, prob_bad = NULL,
                        scale_factor, task_type = NULL, inv_logit_thresh = NULL,
                        predict_task = predict_task_base, pred_list_more = NULL){
   P <- data_stan$P
@@ -1899,7 +1899,127 @@ env_stan$process_HB <- function(data_stan, draws_beta, out_prefix, dir_run, prob
   return(result = list(utilities = utilities, fit_id = fit_id, pred_all = pred_all, scale_factor_pts = scale_factor_mean))
 }
 
-
+env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data){
+  if (min(meta_data$return_codes) == 0){
+    cat("Reading draws from Stan csv output into R (large files take time)...")
+    draws_beta <- read_cmdstan_csv(meta_data$output_files, variables = "beta_ind", format = "draws_list")
+    draws_beta$warmup_draws <- NULL # to save space
+    checkconverge_export(draws_beta, vnames = colnames(data_stan$code_master), control_code$out_prefix,
+                         control_code$dir_run, control_code$export_draws_betas, control_code$export_draws_means)
+    if (data_model$check_bad == 1){
+      prob_bad <- read_cmdstan_csv(meta_data$output_files, variables = "prob_bad", format = "draws_list")
+      prob_bad <- do.call(rbind, lapply(prob_bad$post_warmup_draws, function(x) do.call(cbind, x)))  # draws x n_scales
+      check_draws_vector(meta_data$output_files, "prob_bad", data_stan$resp_id, control_code$dir_run, control_code$out_prefix,makepdf = TRUE)
+    } else prob_bad <- NULL
+    scale_factor_list <- read_cmdstan_csv(meta_data$output_files, variables = "scale_factor_final", format = "draws_list")
+    scale_factor <- do.call(rbind, lapply(scale_factor_list$post_warmup_draws, function(x) do.call(cbind, x)))  # draws x n_scales
+    if (max(data_stan$task_scale_group > 1)) check_draws_vector(meta_data$output_files, "z_log_scale_xref",
+                                                                data_stan$resp_id, control_code$dir_run, control_code$out_prefix,makepdf = TRUE)
+    
+    P <- data_stan$P
+    row_weights <- data_stan$wts[data_stan$idtask_r] 
+    row_holdout <- data_stan$holdout[data_stan$idtask_r]
+    n_holdouts <- sum(data_stan$holdout)
+  
+    utilities <- matrix(NA, data_stan$I, data_stan$P) # Hold utilities
+    pred_all <- matrix(NA, data_stan$N, 2) # Hold predictions points, draws
+    fit_id <- matrix(NA, data_stan$I, 4) # RlH (pts, draws), Prob_Good (HB, LC)
+    if(is.null(prob_bad)){
+     prob_bad_use <- rep(.0001, draws_beta$metadata$iter_sampling * length(draws_beta$post_warmup_draws))
+    } else prob_bad_use <- prob_bad
+    scale_factor <- as.matrix(scale_factor)
+    scale_factor_mean <- exp(colMeans(log(scale_factor)))
+    for (id in (1:data_stan$I)){
+     draw_start <- 1 + (id-1) * P
+     draw_end <- draw_start + P - 1
+     resp_draws <- do.call(cbind, lapply(draws_beta$post_warmup_draws, function(x) do.call(rbind, x[draw_start:draw_end])))
+     resp_pt_mean <- rowMeans(resp_draws)
+    
+     LL_0 <- log(prob_bad_use) # Vector(ndraws)
+     LL_U <- log(1 - prob_bad_use)
+     LL_preds <- c(0,0) # LL of point estimate, mean of draw preds
+     sum_dep <- 0
+     id_specs <- data_stan$id_ranges[id,] # task_beg, task_end, row_beg, row_end, nrows
+     for (t in (id_specs[1]:id_specs[2])){
+      row_beg <- data_stan$start[t]
+      row_end <- data_stan$end[t]
+      ind <- data_stan$ind[row_beg:row_end,]
+      pred_draws_t <- predict_task(t, ind, resp_draws, scale_factor[,data_stan$task_scale_group[t]], task_type,
+                                   inv_logit_thresh, draws = TRUE, pred_list_more) # n_alt x n_draws for task 
+      pred_pt_t <-    predict_task(t, ind, resp_pt_mean, scale_factor_mean[data_stan$task_scale_group[t]], task_type,
+                                   inv_logit_thresh, draws = FALSE, pred_list_more)
+      preds <- cbind(pred_pt_t, rowMeans(pred_draws_t)) # For draws, take mean of n_alt x n_draws
+      pred_all[row_beg:row_end,] <- preds
+      dep <- data_stan$dep[row_beg:row_end] * data_stan$wts[t] * (1 - data_stan$holdout[t]) # Don't count holdouts
+      LL_0 <- LL_0 + (sum(dep) * -log(length(dep))) # LL of 0 vector
+      LL_U <- LL_U + (t(log(pred_draws_t)) %*% dep) # LL of each draw
+      LL_preds <- LL_preds +  dep %*% log(preds)
+      sum_dep <- sum_dep + sum(dep)
+    }
+    
+    id_prob_good <- mean(1/(1 + exp(LL_0 - LL_U))) # = e^LL_U/(e^LL_U + e^LL_0)
+    if(is.null(prob_bad)) id_prob_good <- NA
+    rlh <- exp(LL_preds/sum_dep)
+    fit_id[id,] <- c(rlh, id_prob_good, NA)
+    utilities[id,] <- resp_pt_mean
+    colnames(fit_id) <- c("rlh_pt","rlh_draws","prob_good_hb","prob_good_LC")
+    colnames(pred_all) <- c("pred_pt","pred_draws")
+    
+  }
+  # Export and save
+  if (!is.null(LC_fit)) fit_id[,4] <- LC_fit$LC_prob_good
+  util_name <- paste0(out_prefix,"_utilities_r.csv")
+  pred_name <- paste0(out_prefix,"_preds.csv")
+  fit_name <- paste0(out_prefix,"_Hit_LL.csv")
+  failcon_name <- paste0(out_prefix,"_utilities_failcon.csv")
+  obs_vs_pred_name <- paste0(out_prefix,"_obs_vs_pred.csv")
+  message(paste0(
+    "Saving: \n",
+    " Respondent mean utilities: ", util_name, "\n",
+    " Predictions for data     : ", pred_name, "\n",
+    " Observed vs Predicted    : ", obs_vs_pred_name, "\n",
+    " Hit Rate and LogLike     : ", fit_name
+  ))
+  utilities_r <- utilities %*% t(data_stan$code_master)
+  header <- data.frame(id = data_stan$resp_id, fit_id)
+  write.table(cbind(header, utilities_r), file = file.path(dir_run, util_name), sep = ",", na = ".", row.names = FALSE)
+  
+  pred_all_export <- cbind(data_stan$idtask, holdout = row_holdout, wt = row_weights, dep = data_stan$dep, pred_pt = pred_all[,1], pred_draws = pred_all[,2])
+  if (ncol(data_stan$ind_levels) >0){
+    obs_vs_pred <- obs_vs_pred(pred_all_export[,4:6], data_stan$ind_levels)
+    obs_vs_pred2 <- obs_vs_pred(pred_all_export[,c(4,5,7)], data_stan$ind_levels)
+    obs_vs_pred$pred_per_draws <- obs_vs_pred2$pred_per
+    write.table(obs_vs_pred, file = file.path(dir_run, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
+  } else message("No Categorical Variables found for observed vs predicted")
+  if ("row_in" %in% names(data_stan)){
+    pred_all_export <- cbind(row_in = data_stan$row_in, pred_all_export)
+    pred_all_export <- pred_all_export[order(data_stan$row_in),]
+  } else pred_all_export <- cbind(row_in = NA, pred_all_export)
+  write.table(pred_all_export, file = file.path(dir_run, pred_name), sep = ",", na = ".", row.names = FALSE)
+  
+  fit_hit_LL <- hit_rate_LL(pred_all_export ,col_id = 2,col_task = 3, col_dep = 6,
+                            col_pred = 7, col_split = 4, col_wts = 5)
+  fit_hit_LL <- cbind(type = "MeanPts", data.frame(fit_hit_LL))
+  fit_hit_LL2 <- hit_rate_LL(pred_all_export ,col_id = 2,col_task = 3, col_dep = 6,
+                             col_pred = 8, col_split = 4, col_wts = 5)
+  fit_hit_LL2 <- cbind(type = "Draws", data.frame(fit_hit_LL2))
+  fit_hit_LL <- rbind(fit_hit_LL,fit_hit_LL2)
+  write.table(fit_hit_LL, file = file.path(dir_run, fit_name), sep = ",", na = ".", row.names = FALSE) 
+  write.table(scale_factor_mean, file = file.path(dir_run, paste0(out_prefix,"_scale_factor_mean.csv")), sep = ",", na = ".", row.names = FALSE) 
+  
+  # Check if utilities meet constraints
+  con_matrix <- diag(data_stan$con_sign)
+  con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], data_stan$paircon_matrix)
+  bad_ids <- rowSums(((utilities %*% t(con_matrix)) < 0)) > 0
+  if (sum(bad_ids) > 0){
+    message(paste0(sum(bad_ids), " Respondents had reversals from constraints.\n",
+                   "Reversals saved to: ", failcon_name))
+    write.table(cbind(header, utilities_r)[bad_ids,], file = file.path(dir_run, failcon_name), sep = ",", na = ".", row.names = FALSE)
+  } else message(" All respondent mean utilities obey constraints")
+  
+  return(result = list(utilities = utilities, fit_id = fit_id, pred_all = pred_all, scale_factor_draws = scale_factor, scale_factor_pts = scale_factor_mean, beta_draws = beta_draws))
+  } else message("Stan Estimation Did not Finish")
+}
 
 env_eb$numder_2 <- function(x, pos, delta = .01){
   # 2nd derivative
