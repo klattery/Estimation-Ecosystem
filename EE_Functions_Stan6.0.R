@@ -1132,7 +1132,8 @@ env_stan$get_covariates <- function(output_files, data_stan, dir_out, out_prefix
 
 env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_run,
                                           export_draws_betas, export_draws_means,
-                                          resp_id = data_stan$resp_id, code_master = data_stan$code_master){
+                                          resp_id = data_stan$resp_id, code_master = data_stan$code_master,
+                                          makepdf = TRUE){
   nchains <- length(draws_beta$post_warmup_draws)
   nresp <- draws_beta$metadata$stan_variable_sizes$beta_ind[2] # num respondents
   npar <- draws_beta$metadata$stan_variable_sizes$beta_ind[1]
@@ -1178,18 +1179,20 @@ env_stan$checkconverge_export <- function(draws_beta, vnames, out_prefix, dir_ru
     write.table(draws_beta_mu_export, file = file.path(dir_run, paste0(out_prefix,"_draws_beta_means.csv")), sep = ",", na = ".", row.names = FALSE)
   }
   
-  # Create pdf of acceptance rate + traceplots 
-  pdf(file = file.path(dir_run, pdf_name),   # The directory you want to save the file in
-      width = 7, # The width of the plot in inches
-      height = 5) # The height of the plot in inches
-  hist(as.vector(sapply(draws_beta$post_warmup_sampler_diagnostics, function(x) x$accept_stat__)), breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
-  for (chain_i in (1:nchains)){
-    matplot(1:nrow(draws_beta_mu[[chain_i]]), draws_beta_mu[[chain_i]],
-            type = "l" , lty = 1, lwd = 1, main = paste0("Chain ", chain_i), xlab = "Iteration", ylab = "Mean Beta")   
+  # Create pdf of acceptance rate + traceplots
+  if (makepdf){
+    pdf(file = file.path(dir_run, pdf_name),   # The directory you want to save the file in
+        width = 7, # The width of the plot in inches
+        height = 5) # The height of the plot in inches
+    hist(as.vector(sapply(draws_beta$post_warmup_sampler_diagnostics, function(x) x$accept_stat__)), breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0,1))
+    for (chain_i in (1:nchains)){
+      matplot(1:nrow(draws_beta_mu[[chain_i]]), draws_beta_mu[[chain_i]],
+              type = "l" , lty = 1, lwd = 1, main = paste0("Chain ", chain_i), xlab = "Iteration", ylab = "Mean Beta")   
+    }
+    fit_stats <- plot_draws_df(draws= draws_beta_mu, vnames = vnames, ylab = "Mean Beta") # Plots each column
+    dev.off()
+    write.table(fit_stats, file = file.path(dir_run, paste0(out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
   }
-  fit_stats <- plot_draws_df(draws= draws_beta_mu, vnames = vnames, ylab = "Mean Beta") # Plots each column
-  dev.off()
-  write.table(fit_stats, file = file.path(dir_run, paste0(out_prefix,"_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
 }
 
 
@@ -1907,17 +1910,17 @@ env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
     draws_beta <- read_cmdstan_csv(meta_data$output_files, variables = "beta_ind", format = "draws_list")
     draws_beta$warmup_draws <- NULL # to save space
     checkconverge_export(draws_beta, vnames = colnames(data_stan$code_master), control_code$out_prefix,
-                         control_code$dir_run, control_code$export_draws_betas, control_code$export_draws_means)
+                         control_code$dir_run, control_code$export_draws_betas, control_code$export_draws_means, makepdf = ("draws_beta" %in% control_code$makepdf))
     if (data_model$check_bad == 1){
       prob_bad <- read_cmdstan_csv(meta_data$output_files, variables = "prob_bad", format = "draws_list")
       prob_bad <- do.call(rbind, lapply(prob_bad$post_warmup_draws, function(x) do.call(cbind, x)))  # draws x n_scales
-      check_draws_vector(meta_data$output_files, "prob_bad", data_stan$resp_id, control_code$dir_run, control_code$out_prefix,makepdf = TRUE)
+      check_draws_vector(meta_data$output_files, "prob_bad", data_stan$resp_id, control_code$dir_run, control_code$out_prefix,makepdf = ("prob_bad" %in% control_code$makepdf))
     } else prob_bad <- NULL
     scale_factor_list <- read_cmdstan_csv(meta_data$output_files, variables = "scale_factor_final", format = "draws_list")
     scale_factor <- do.call(rbind, lapply(scale_factor_list$post_warmup_draws, function(x) do.call(cbind, x)))  # draws x n_scales
     if (max(data_stan$task_scale_group > 1)) check_draws_vector(meta_data$output_files, "z_log_scale_xref",
-                                                                data_stan$resp_id, control_code$dir_run, control_code$out_prefix,makepdf = TRUE)
-    
+                                                                data_stan$resp_id, control_code$dir_run, control_code$out_prefix,makepdf = ("scale_factor" %in% control_code$makepdf))
+    out_prefix <- control_code$out_prefix
     P <- data_stan$P
     row_weights <- data_stan$wts[data_stan$idtask_r] 
     row_holdout <- data_stan$holdout[data_stan$idtask_r]
