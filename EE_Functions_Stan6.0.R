@@ -1899,7 +1899,9 @@ env_stan$process_HB_old <- function(data_stan, draws_beta, out_prefix, dir_run, 
   return(result = list(utilities = utilities, fit_id = fit_id, pred_all = pred_all, scale_factor_pts = scale_factor_mean))
 }
 
-env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data){
+env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
+                                predict_task = predict_task_base, pred_list_more = NULL,
+                                task_type = NULL, inv_logit_thresh = NULL){
   if (min(meta_data$return_codes) == 0){
     cat("Reading draws from Stan csv output into R (large files take time)...")
     draws_beta <- read_cmdstan_csv(meta_data$output_files, variables = "beta_ind", format = "draws_list")
