@@ -1742,6 +1742,7 @@ env_stan$LC_est <- function(data_stan, data_model, out_folder, stanout, out_pref
       "Total Loglikelihood of each LC solution: \n"
     ))
     print(as.data.frame(LC_LL))
+    write.table(data.frame(LC_LL), file = file.path(dir_run, paste0(out_prefix,"_LC_LL.csv")), sep = ",", na = ".", row.names = FALSE)
     write.table(LC_probsno0, file = file.path(dir_run, paste0(out_prefix,"_LC_probs.csv")), sep = ",", na = ".", row.names = FALSE)
     LC_betas <- cbind(data.frame(att = row.names(data_stan$code_master)), SawPrize_LC_betas)
     write.table(LC_betas, file = file.path(dir_run, paste0(out_prefix,"_LC_betas.csv")), sep = ",", na = ".", row.names = FALSE)
