@@ -1916,7 +1916,7 @@ env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
     if (data_model$check_bad == 1){
       prob_bad <- read_cmdstan_csv(meta_data$output_files, variables = "prob_bad", format = "draws_list")
       prob_bad <- do.call(rbind, lapply(prob_bad$post_warmup_draws, function(x) do.call(cbind, x)))  # draws x n_scales
-      check_draws_vector(meta_data$output_files, "prob_bad", data_stan$resp_id, control_code$dir_run, control_code$out_prefix,makepdf = ("prob_bad" %in% control_code$makepdf))
+      check_draws_vector(meta_data$output_files, "prob_bad", "prob_bad_agg", control_code$dir_run, control_code$out_prefix,makepdf = ("prob_bad" %in% control_code$makepdf))
     } else prob_bad <- NULL
     scale_factor_list <- read_cmdstan_csv(meta_data$output_files, variables = "scale_factor_final", format = "draws_list")
     scale_factor <- do.call(rbind, lapply(scale_factor_list$post_warmup_draws, function(x) do.call(cbind, x)))  # draws x n_scales
