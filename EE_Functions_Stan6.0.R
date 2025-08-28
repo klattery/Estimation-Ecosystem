@@ -958,6 +958,11 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
     if (check_con <= 0) message("Please check constraints. Could not find initial value that satisfied your constraints. HB estimation in Stan can run, but constrained optimization models in R like Empirical Bayes cannot.\n")    
   }
   
+  if (.GlobalEnv$control_code$add_none){
+    if  (is.null(.GlobalEnv$indcode_spec$None$message)){
+      cat("\nDid not Add a 'None' as no rows of all 0 found.\n")
+    } else cat(.GlobalEnv$indcode_spec$None$message)  
+  }
   
   return(modifyList(result, list(
     con_sign = indcode_list$con_sign,
