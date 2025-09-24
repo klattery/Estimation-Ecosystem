@@ -888,7 +888,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   result$npos_m1 <- aggregate(dep>0, list(idtask_r), sum)[,2]- 1
   result$npos_m1[result$npos_m1 < 0] <- 0 # In case all deps for task are 0
   if (!is.null(other_data)) {
-    result$other_data <- as.matrix(other_data)[sort_order,]
+    result$other_data <- data.frame(other_data)[sort_order,,drop=FALSE] # data.frame in case other_data is vector
   } else result$other_data <- 0
   
   # Friendly output
