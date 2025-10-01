@@ -1759,8 +1759,8 @@ env_stan$LC_est <- function(data_stan, data_model, out_folder, stanout, out_pref
 
 
 env_stan$predict_task_base <- function(t, ind, utilities, scale_factor, task_type = NULL, inv_logit_thresh = NULL, draws = FALSE, pred_list_more = NULL){
-  # utilities is        Px1 vector or P x # draws 
-  # inv_logit_thresh is Tx1 vector or t x # draws
+  # utilities is        Px1 vector or P x # draws for 1 respondent
+  # inv_logit_thresh is for binary logit (NULL = 0, else single pt or vector of draws) 
   # scale_factor is scale_factor for that task (single pt or vector of draws)
   if (!draws){ # U is nalt x 1 vector
     U <- exp(ind %*% (utilities * scale_factor)) # utilities is vector, scale_factor is scalar, U is vector
@@ -1774,7 +1774,7 @@ env_stan$predict_task_base <- function(t, ind, utilities, scale_factor, task_typ
         if (is.null(inv_logit_thresh)){
           pred <- U/(1 + U)
         } else {
-          pred <- U/(exp(inv_logit_thresh[t]) + U)
+          pred <- U/(exp(inv_logit_thresh) + U)
         }
       }
     }
@@ -1793,7 +1793,7 @@ env_stan$predict_task_base <- function(t, ind, utilities, scale_factor, task_typ
         if (is.null(inv_logit_thresh)){
           pred <- U/(1 + U)
         } else {
-          UminusT <- sweep(log(U), 2, inv_logit_thresh[t,], "-")
+          UminusT <- sweep(log(U), 2, inv_logit_thresh, "-")
           pred <- 1/(1 + exp(-UminusT))
         }
       }
@@ -1943,7 +1943,9 @@ env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
     } else prob_bad_use <- prob_bad
     scale_factor <- as.matrix(scale_factor)
     scale_factor_mean <- exp(colMeans(log(scale_factor)))
+    inv_logit_thresh_resp <- NULL
     for (id in (1:data_stan$I)){
+      if (!is.null(inv_logit_thresh)) inv_logit_thresh_resp <- inv_logit_thresh[,id] # draws for 1 resp
       draw_start <- 1 + (id-1) * P
       draw_end <- draw_start + P - 1
       resp_draws <- do.call(cbind, lapply(draws_beta$post_warmup_draws, function(x) do.call(rbind, x[draw_start:draw_end])))
@@ -1959,9 +1961,9 @@ env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
         row_end <- data_stan$end[t]
         ind <- data_stan$ind[row_beg:row_end,]
         pred_draws_t <- predict_task(t, ind, resp_draws, scale_factor[,data_stan$task_scale_group[t]], task_type,
-                                     inv_logit_thresh, draws = TRUE, pred_list_more) # n_alt x n_draws for task 
+                                     inv_logit_thresh_resp, draws = TRUE, pred_list_more) # n_alt x n_draws for task 
         pred_pt_t <-    predict_task(t, ind, resp_pt_mean, scale_factor_mean[data_stan$task_scale_group[t]], task_type,
-                                     inv_logit_thresh, draws = FALSE, pred_list_more)
+                                     mean(inv_logit_thresh_resp), draws = FALSE, pred_list_more)
         preds <- cbind(pred_pt_t, rowMeans(pred_draws_t)) # For draws, take mean of n_alt x n_draws
         pred_all[row_beg:row_end,] <- preds
         dep <- data_stan$dep[row_beg:row_end] * data_stan$wts[t] * (1 - data_stan$holdout[t]) # Don't count holdouts
