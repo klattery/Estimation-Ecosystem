@@ -1686,6 +1686,80 @@ env_stan$eb_betas_est <- function(data_stan, draws_beta, x0, r_cores, out_prefix
 }
 
 # Version 6.0 Improvements
+env_stan$LC_est_v4 <- function(data_stan, data_model, out_folder, stanout, out_prefix, dir_save){
+  if (min(data_model$LC_segs) > 0){
+    LC_outname <- paste0(out_folder, "_LCOut")
+    LC_betas <- c()
+    LC_probs0 <- data.frame(id = data_stan$resp_id)
+    LC_probsno0 <- data.frame(id = data_stan$resp_id)
+    LC_LL <- c()
+    LC_pred <- cbind(row_in = data_stan$row_in, dep = data_stan$dep)
+    for (nseg in data_model$LC_segs){
+      data_model$Nseg <- nseg #fancy formula as standard for the number of segments?
+      LC_optim <- LC_model$optimize(modifyList(data_stan, data_model),
+                                    seed = NULL,
+                                    refresh = 10,
+                                    init = 0.1,
+                                    save_latent_dynamics = FALSE,
+                                    output_dir = stanout,
+                                    output_basename = LC_outname,
+                                    sig_figs = NULL,
+                                    threads =  (detectCores() ),
+                                    opencl_ids = NULL,
+                                    algorithm = "lbfgs",
+                                    init_alpha = NULL,
+                                    iter = 20000)
+      LC_lp <- unlist(read_cmdstan_csv(LC_optim$output_files(), variables = "lp__", format = "draws_list")$point_estimates)
+      resp_seg_prob_posterior <- read_cmdstan_csv(LC_optim$output_files(), variables = "resp_seg_prob_posterior_w0", format = "draws_list")
+      resp_seg_prob_posterior <- matrix((unlist(resp_seg_prob_posterior$point_estimates)),nrow=data_stan$I)
+      # resp_seg_prob_prior <- read_cmdstan_csv(LC_optim$output_files(), variables = "resp_seg_prob_prior", format = "draws_list")
+      # resp_seg_prob_prior <- matrix((unlist(resp_seg_prob_prior$point_estimates)),nrow=data_stan$I)
+      colnames(resp_seg_prob_posterior) <- paste0("prob_seg",nseg,"_",0:nseg)
+      resp_seg_x0 <- read_cmdstan_csv(LC_optim$output_files(), variables = "resp_seg_prob_posterior_x0", format = "draws_list")
+      resp_seg_x0 <- matrix((unlist(resp_seg_x0$point_estimates)),nrow=data_stan$I)
+      
+      beta_seg <- read_cmdstan_csv(LC_optim$output_files(), variables = "beta_seg", format = "draws_list")
+      beta_seg <- matrix((unlist(beta_seg$point_estimates)),nrow=data_stan$P)
+      
+      # Get respondent predictions and overall fit
+      pred <- data_stan$dep
+      for (t in (1:data_stan$T)){
+        data_rows <- data_stan$start[t]:data_stan$end[t]
+        util_byseg <- exp(data_stan$ind[data_rows,] %*% beta_seg)
+        pred_t <- util_byseg[,-1] %*% as.matrix(resp_seg_x0[data_stan$task_individual[t],]/colSums(util_byseg[,-1, drop = FALSE]))
+        pred[data_rows] <- pred_t
+      }
+      
+      LC_utilities <- data_stan$code_master %*% beta_seg
+      colnames(LC_utilities)<-paste0("seg",nseg,"_",0:nseg)
+      LC_utilities_no0 <- LC_utilities[,-1] # remove LC segment with all 0 utilities
+      # Combine outputs
+      LC_LL <- c(LC_LL, LC_lp)
+      LC_betas <- cbind(LC_betas,LC_utilities_no0)
+      probs0 <- resp_seg_prob_posterior[,1] # Prob of 0
+      if (data_model$LC_betas0 == 0) probs0[] <- NA # If no 0 estimated then set prob0 = NA
+      LC_probs0 <- cbind(LC_probs0,probs0)
+      LC_probsno0 <- cbind(LC_probsno0,resp_seg_x0)
+      LC_pred <- cbind(LC_pred, pred)
+    }
+    names(LC_LL) <- paste0(c("LL_seg_"),data_model$LC_segs)
+    LC_pred[data_stan$row_in,] <- LC_pred
+    message("Total Loglikelihood of each LC solution: \n")
+    print(as.data.frame(LC_LL))
+    LC_betas <- cbind(data.frame(att = row.names(data_stan$code_master)), LC_betas)
+    result <- list(LC_LL = LC_LL, LC_betas = LC_betas, LC_probs = LC_probsno0, LC_probs0 = LC_probs0, LC_pred = LC_pred, LC_prob_good = 1 - apply(LC_probs0[,-1, drop = FALSE],1,min))
+    if (!is.null(dir_save)){
+      write.table(data.frame(LC_LL), file = file.path(dir_save, paste0(out_prefix,"_LC_LL.csv")), sep = ",", na = ".", row.names = TRUE)
+      write.table(LC_probsno0, file = file.path(dir_save, paste0(out_prefix,"_LC_probs.csv")), sep = ",", na = ".", row.names = FALSE)
+      write.table(LC_probs0, file = file.path(dir_save, paste0(out_prefix,"_LC_probs0.csv")), sep = ",", na = ".", row.names = FALSE)
+      write.table(LC_betas, file = file.path(dir_save, paste0(out_prefix,"_LC_betas.csv")), sep = ",", na = ".", row.names = FALSE)
+      saveRDS(result, file.path(dir_save, paste0(out_prefix, "_LC_fit.rds")))      
+    }
+  } else result <- NULL
+  return(result)
+}
+
+
 env_stan$LC_est <- function(data_stan, data_model, out_folder, stanout, out_prefix, dir_run){
   if (min(data_model$LC_segs) > 0){
     LC_outname <- paste0(out_folder, "_LCOut")
@@ -1802,113 +1876,6 @@ env_stan$predict_task_base <- function(t, ind, utilities, scale_factor, task_typ
   return(pred) # For draws this returns n_alt x n_draws
 }
 
-env_stan$process_HB_old <- function(data_stan, draws_beta, out_prefix, dir_run, prob_bad = NULL,
-                       scale_factor, task_type = NULL, inv_logit_thresh = NULL,
-                       predict_task = predict_task_base, pred_list_more = NULL){
-  P <- data_stan$P
-  row_weights <- data_stan$wts[data_stan$idtask_r] 
-  row_holdout <- data_stan$holdout[data_stan$idtask_r]
-  n_holdouts <- sum(data_stan$holdout)
-  
-  utilities <- matrix(NA, data_stan$I, data_stan$P) # Hold utilities
-  pred_all <- matrix(NA, data_stan$N, 2) # Hold predictions points, draws
-  fit_id <- matrix(NA, data_stan$I, 4) # RlH (pts, draws), Prob_Good (HB, LC)
-  if(is.null(prob_bad)){
-    prob_bad_use <- rep(.0001, draws_beta$metadata$iter_sampling * length(draws_beta$post_warmup_draws))
-  } else prob_bad_use <- prob_bad
-  scale_factor <- as.matrix(scale_factor)
-  scale_factor_mean <- exp(colMeans(log(scale_factor)))
-  for (id in (1:data_stan$I)){
-    draw_start <- 1 + (id-1) * P
-    draw_end <- draw_start + P - 1
-    resp_draws <- do.call(cbind, lapply(draws_beta$post_warmup_draws, function(x) do.call(rbind, x[draw_start:draw_end])))
-    resp_pt_mean <- rowMeans(resp_draws)
-    
-    LL_0 <- log(prob_bad_use) # Vector(ndraws)
-    LL_U <- log(1 - prob_bad_use)
-    LL_preds <- c(0,0) # LL of point estimate, mean of draw preds
-    sum_dep <- 0
-    id_specs <- data_stan$id_ranges[id,] # task_beg, task_end, row_beg, row_end, nrows
-    for (t in (id_specs[1]:id_specs[2])){
-      row_beg <- data_stan$start[t]
-      row_end <- data_stan$end[t]
-      ind <- data_stan$ind[row_beg:row_end,]
-      pred_draws_t <- predict_task(t, ind, resp_draws, scale_factor[,data_stan$task_scale_group[t]], task_type,
-                                   inv_logit_thresh, draws = TRUE, pred_list_more) # n_alt x n_draws for task 
-      pred_pt_t <-    predict_task(t, ind, resp_pt_mean, scale_factor_mean[data_stan$task_scale_group[t]], task_type,
-                                   inv_logit_thresh, draws = FALSE, pred_list_more)
-      preds <- cbind(pred_pt_t, rowMeans(pred_draws_t)) # For draws, take mean of n_alt x n_draws
-      pred_all[row_beg:row_end,] <- preds
-      dep <- data_stan$dep[row_beg:row_end] * data_stan$wts[t] * (1 - data_stan$holdout[t]) # Don't count holdouts
-      LL_0 <- LL_0 + (sum(dep) * -log(length(dep))) # LL of 0 vector
-      LL_U <- LL_U + (t(log(pred_draws_t)) %*% dep) # LL of each draw
-      LL_preds <- LL_preds +  dep %*% log(preds)
-      sum_dep <- sum_dep + sum(dep)
-    }
-    
-    id_prob_good <- mean(1/(1 + exp(LL_0 - LL_U))) # = e^LL_U/(e^LL_U + e^LL_0)
-    if(is.null(prob_bad)) id_prob_good <- NA
-    rlh <- exp(LL_preds/sum_dep)
-    fit_id[id,] <- c(rlh, id_prob_good, NA)
-    utilities[id,] <- resp_pt_mean
-    colnames(fit_id) <- c("rlh_pt","rlh_draws","prob_good_hb","prob_good_LC")
-    colnames(pred_all) <- c("pred_pt","pred_draws")
-    
-  }
-  # Export and save
-  if (!is.null(LC_fit)) fit_id[,4] <- LC_fit$LC_prob_good
-  util_name <- paste0(out_prefix,"_utilities_r.csv")
-  pred_name <- paste0(out_prefix,"_preds.csv")
-  fit_name <- paste0(out_prefix,"_Hit_LL.csv")
-  failcon_name <- paste0(out_prefix,"_utilities_failcon.csv")
-  obs_vs_pred_name <- paste0(out_prefix,"_obs_vs_pred.csv")
-  message(paste0(
-    "Saving: \n",
-    " Respondent mean utilities: ", util_name, "\n",
-    " Predictions for data     : ", pred_name, "\n",
-    " Observed vs Predicted    : ", obs_vs_pred_name, "\n",
-    " Hit Rate and LogLike     : ", fit_name
-  ))
-  utilities_r <- utilities %*% t(data_stan$code_master)
-  header <- data.frame(id = data_stan$resp_id, fit_id)
-  write.table(cbind(header, utilities_r), file = file.path(dir_run, util_name), sep = ",", na = ".", row.names = FALSE)
-  
-  pred_all_export <- cbind(data_stan$idtask, holdout = row_holdout, wt = row_weights, dep = data_stan$dep, pred_pt = pred_all[,1], pred_draws = pred_all[,2])
-  if (ncol(data_stan$ind_levels) >0){
-    obs_vs_pred <- obs_vs_pred(pred_all_export[,4:6], data_stan$ind_levels)
-    obs_vs_pred2 <- obs_vs_pred(pred_all_export[,c(4,5,7)], data_stan$ind_levels)
-    obs_vs_pred$pred_per_draws <- obs_vs_pred2$pred_per
-    write.table(obs_vs_pred, file = file.path(dir_run, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
-  } else message("No Categorical Variables found for observed vs predicted")
-  if ("row_in" %in% names(data_stan)){
-    pred_all_export <- cbind(row_in = data_stan$row_in, pred_all_export)
-    pred_all_export <- pred_all_export[order(data_stan$row_in),]
-  } else pred_all_export <- cbind(row_in = NA, pred_all_export)
-  write.table(pred_all_export, file = file.path(dir_run, pred_name), sep = ",", na = ".", row.names = FALSE)
-  
-  fit_hit_LL <- hit_rate_LL(pred_all_export ,col_id = 2,col_task = 3, col_dep = 6,
-                            col_pred = 7, col_split = 4, col_wts = 5)
-  fit_hit_LL <- cbind(type = "MeanPts", data.frame(fit_hit_LL))
-  fit_hit_LL2 <- hit_rate_LL(pred_all_export ,col_id = 2,col_task = 3, col_dep = 6,
-                             col_pred = 8, col_split = 4, col_wts = 5)
-  fit_hit_LL2 <- cbind(type = "Draws", data.frame(fit_hit_LL2))
-  fit_hit_LL <- rbind(fit_hit_LL,fit_hit_LL2)
-  write.table(fit_hit_LL, file = file.path(dir_run, fit_name), sep = ",", na = ".", row.names = FALSE) 
-  write.table(scale_factor_mean, file = file.path(dir_run, paste0(out_prefix,"_scale_factor_mean.csv")), sep = ",", na = ".", row.names = FALSE) 
-  
-  # Check if utilities meet constraints
-  con_matrix <- diag(data_stan$con_sign)
-  con_matrix <- rbind(con_matrix[rowSums(con_matrix !=0) > 0,,drop = FALSE], data_stan$paircon_matrix)
-  bad_ids <- rowSums(((utilities %*% t(con_matrix)) < 0)) > 0
-  if (sum(bad_ids) > 0){
-    message(paste0(sum(bad_ids), " Respondents had reversals from constraints.\n",
-                   "Reversals saved to: ", failcon_name))
-    write.table(cbind(header, utilities_r)[bad_ids,], file = file.path(dir_run, failcon_name), sep = ",", na = ".", row.names = FALSE)
-  } else message(" All respondent mean utilities obey constraints")
-  
-  return(result = list(utilities = utilities, fit_id = fit_id, pred_all = pred_all, scale_factor_pts = scale_factor_mean))
-}
-
 env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
                                 predict_task = predict_task_base, pred_list_more = NULL,
                                 task_type = NULL, inv_logit_thresh = NULL){
@@ -1943,9 +1910,12 @@ env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
     } else prob_bad_use <- prob_bad
     scale_factor <- as.matrix(scale_factor)
     scale_factor_mean <- exp(colMeans(log(scale_factor)))
-    inv_logit_thresh_resp <- NULL
+    inv_logit_thresh_resp <- inv_logit_thresh_resp_pt <- NULL
     for (id in (1:data_stan$I)){
-      if (!is.null(inv_logit_thresh)) inv_logit_thresh_resp <- inv_logit_thresh[,id] # draws for 1 resp
+      if (!is.null(inv_logit_thresh)){
+        inv_logit_thresh_resp <- inv_logit_thresh[,id] # draws for 1 resp
+        inv_logit_thresh_resp_pt <- mean(inv_logit_thresh_resp) # point estimate mean
+      } 
       draw_start <- 1 + (id-1) * P
       draw_end <- draw_start + P - 1
       resp_draws <- do.call(cbind, lapply(draws_beta$post_warmup_draws, function(x) do.call(rbind, x[draw_start:draw_end])))
@@ -1963,7 +1933,7 @@ env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
         pred_draws_t <- predict_task(t, ind, resp_draws, scale_factor[,data_stan$task_scale_group[t]], task_type,
                                      inv_logit_thresh_resp, draws = TRUE, pred_list_more) # n_alt x n_draws for task 
         pred_pt_t <-    predict_task(t, ind, resp_pt_mean, scale_factor_mean[data_stan$task_scale_group[t]], task_type,
-                                     mean(inv_logit_thresh_resp), draws = FALSE, pred_list_more)
+                                     inv_logit_thresh_resp_pt, draws = FALSE, pred_list_more)
         preds <- cbind(pred_pt_t, rowMeans(pred_draws_t)) # For draws, take mean of n_alt x n_draws
         pred_all[row_beg:row_end,] <- preds
         dep <- data_stan$dep[row_beg:row_end] * data_stan$wts[t] * (1 - data_stan$holdout[t]) # Don't count holdouts
