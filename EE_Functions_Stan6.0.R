@@ -1693,7 +1693,7 @@ env_stan$LC_est_v4 <- function(data_stan, data_model, out_folder, stanout, out_p
     LC_probs0 <- data.frame(id = data_stan$resp_id)
     LC_probsno0 <- data.frame(id = data_stan$resp_id)
     LC_LL <- c()
-    LC_pred <- cbind(row_in = data_stan$row_in, data_stan$idtask, data_stan$holdout[idtask_r], wt = data_stan$wts[data_stan$idtask_r], dep = data_stan$dep)
+    LC_pred <- cbind(row_in = data_stan$row_in, data_stan$idtask, data_stan$holdout[data_stan$idtask_r], wt = data_stan$wts[data_stan$idtask_r], dep = data_stan$dep)
 
     for (nseg in data_model$LC_segs){
       data_model$Nseg <- nseg #fancy formula as standard for the number of segments?
