@@ -1913,7 +1913,7 @@ env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
     scale_factor_mean <- exp(colMeans(log(scale_factor)))
     inv_logit_thresh_resp <- inv_logit_thresh_resp_pt <- NULL
     for (id in (1:data_stan$I)){
-      if (!is.null(inv_logit_thresh)){
+      if (!is.null(inv_logit_thresh)){ # matrix of draws x respondents
         inv_logit_thresh_resp <- inv_logit_thresh[,id] # draws for 1 resp
         inv_logit_thresh_resp_pt <- mean(inv_logit_thresh_resp) # point estimate mean
       } 
@@ -1968,6 +1968,9 @@ env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
       " Hit Rate and LogLike     : ", fit_name
     ))
     utilities_r <- utilities %*% t(data_stan$code_master)
+    if (!is.null(inv_logit_thresh)){
+      utilities_r <- cbind(utilities_r, logit_thresh = colMeans(inv_logit_thresh)) # add logit_thresh to end
+    }
     header <- data.frame(id = data_stan$resp_id, fit_id)
     write.table(cbind(header, utilities_r), file = file.path(dir_run, util_name), sep = ",", na = ".", row.names = FALSE)
     
@@ -1992,7 +1995,7 @@ env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
     fit_hit_LL2 <- cbind(type = "Draws", data.frame(fit_hit_LL2))
     fit_hit_LL <- rbind(fit_hit_LL,fit_hit_LL2)
     write.table(fit_hit_LL, file = file.path(dir_run, fit_name), sep = ",", na = ".", row.names = FALSE) 
-    write.table(scale_factor_mean, file = file.path(dir_run, paste0(out_prefix,"_scale_factor_mean.csv")), sep = ",", na = ".", row.names = FALSE) 
+    write.table(scale_factor_mean, file = file.path(dir_run, paste0(out_prefix,"_scale_factor_mean.csv")), sep = ",", na = ".", row.names = FALSE, col.names = FALSE) 
     
     # Check if utilities meet constraints
     con_matrix <- diag(data_stan$con_sign)
