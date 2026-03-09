@@ -562,9 +562,11 @@ env_code$make_codefiles <- function(indcode_spec, control_code = .GlobalEnv$cont
       for (i in cat_values_u){
         if (i >0){
           cat_filter <- (cat_values == i)
-          min_cols <- apply(therm_data[cat_filter,], 2 , min)
-          max_cols <- apply(therm_data[cat_filter,], 2 , max)
-          recodes <- -min_cols * (min_cols == max_cols) * (min_cols != 0) # 0 unless min_cols != 0 and min = max
+          # min_cols <- apply(therm_data[cat_filter,], 2 , min)
+          # max_cols <- apply(therm_data[cat_filter,], 2 , max)
+          # recodes <- -min_cols * (min_cols == max_cols) * (min_cols != 0) # 0 unless min_cols != 0 and min = max
+          avg_cols <- apply(therm_data[cat_filter,], 2 , mean) # Remco update Mar 2026
+          recodes <- -avg_cols
           # Change code_master
           code_master[row_change,therm_cols_change] <- recodes # Changing code_master
           row_change <- row_change+1    
