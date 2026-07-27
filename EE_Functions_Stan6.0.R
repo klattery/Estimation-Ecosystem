@@ -644,13 +644,15 @@ env_code$make_codefiles <- function(indcode_spec, control_code = .GlobalEnv$cont
   }
   
   # Check if paircon_matrix has lots of non-zero cols
-  ncol_con <- rowSums(result$con_matrix != 0)
-  if (max(ncol_con) > 3){
-    cols_show <- colSums(result$con_matrix) != 0
-    cat("WARNING: Your pairwise constraints created very complex constraints\n")
-    print(result$con_matrix[ncol_con>3,cols_show])
-    cat("Consider custom coding attributes above to simplify constraints\n\n")
-  } 
+  if (nrow(result$con_matrix) > 0){
+    ncol_con <- rowSums(result$con_matrix != 0)
+    if (max(ncol_con) > 3){
+      cols_show <- colSums(result$con_matrix) != 0
+      cat("WARNING: Your coding + constraints created very complex constraints\n")
+      print(result$con_matrix[ncol_con>3,cols_show])
+      cat("Consider custom coding to simplify constraints\n\n")
+    } 
+  }
   return(result)
 }
 
