@@ -642,6 +642,15 @@ env_code$make_codefiles <- function(indcode_spec, control_code = .GlobalEnv$cont
     if (min(check) <= 0) cat("Could not find initial x0 that satisfies constraints. \nSet indcode_list$x0 manually if using EB")
     result$x0 <- x0
   }
+  
+  # Check if paircon_matrix has lots of non-zero cols
+  ncol_con <- rowSums(result$con_matrix != 0)
+  if (max(ncol_con) > 3){
+    cols_show <- colSums(result$con_matrix) != 0
+    cat("WARNING: Your pairwise constraints created very complex constraints\n")
+    print(result$con_matrix[ncol_con>3,cols_show])
+    cat("Consider custom coding attributes above to simplify constraints\n\n")
+  } 
   return(result)
 }
 
