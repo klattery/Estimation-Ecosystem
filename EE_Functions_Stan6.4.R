@@ -862,6 +862,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
   sort_order[!train] <- 0 # Non-training gets order = 0, which removes
   result$row_in <- (1:nrow(idtaskdep))[sort_order] # Initial order of data with non-training removed
   result$ind <- as.matrix(indcode_list$indcode[sort_order,])
+  result$ind_dens<-mean(abs(result$ind)>0)
   result$ind_coded <- as.matrix(indcode_list$ind_coded[sort_order,])
   result$ind_levels <- as.matrix(indcode_list$ind_levels[sort_order,])
   colnames(result$ind_levels) <- colnames(indcode_list$ind_levels)
