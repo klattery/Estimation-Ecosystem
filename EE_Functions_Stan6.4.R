@@ -1105,7 +1105,6 @@ env_stan$plot_draws_df <- function(draws, vnames = NULL, ylab = "Draw", pdf_path
                         "| ESS = ", round(ess_basic(x),1)
            ))
       abline(h = fit_stats$mean[i])
-      text(x=1, y = fit_stats$mean[i], labels = fit_stats$mean[i], pos = 3)
       if (ncol(x) > 1){
         for (chain in 2:ncol(x)){
           lines(x[,chain], type = "l", col = chain_colors[chain])
