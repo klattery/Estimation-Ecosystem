@@ -11,10 +11,13 @@ if (exists("env_code")) rm(env_code)
 if (exists("env_modfun"))  rm(env_modfun)
 if (exists("env_eb")) rm(env_eb)
 if (exists("env_stan")) rm(env_stan)
+if (exists("env_process_wC")) rm(env_process_wC)
+
 env_code <- new.env(parent = emptyenv())
 env_modfun <- new.env(parent = emptyenv())
 env_eb <- new.env(parent = emptyenv())
 env_stan <- new.env(parent = emptyenv())
+env_process_wC <- new.env(parent = emptyenv())
 
 ###############  Coding Functions Environment ################ 
 
@@ -1127,6 +1130,14 @@ env_stan$check_draws_vector <- function(output_files, stan_vector, vector_labels
   write.table(fit_stats_var, file = file.path(out_dir, paste0(out_prefix,"_fit_stats_", stan_vector,".csv")), sep = ",", na = ".", row.names = FALSE)
 } 
 
+# Equivalent of check_draws_vector, but from in-memory per-chain matrices
+env_stan$check_draws_vector_fast <- function(chain_mats, stan_vector, vector_labels, out_dir, out_prefix, makepdf) {
+  fit_stats <- plot_draws_df(chain_mats, vector_labels, toupper(stan_vector),
+                             pdf_path = file.path(out_dir, paste0(out_prefix, "_trace_", stan_vector, ".pdf")), makepdf = makepdf)
+  write.table(fit_stats, file = file.path(out_dir, paste0(out_prefix, "_fit_stats_", stan_vector, ".csv")), sep = ",", na = ".", row.names = FALSE)
+  invisible(fit_stats)
+}
+
 env_stan$get_mean_beta <- function(draws_beta){
   nchains <- length(draws_beta$post_warmup_draws)
   result <- matrix(
@@ -1930,7 +1941,10 @@ env_stan$predict_task_base <- function(t, ind, utilities, scale_factor, task_typ
 
 env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
                                 predict_task = predict_task_base, pred_list_more = NULL,
-                                task_type = NULL, inv_logit_thresh = NULL){
+                                task_type = NULL, inv_logit_thresh = NULL,
+                                fastC = FALSE){
+  # Original code added fastC parameter that is not used for compatibility
+  # Otherwise identical to old process_HB
   if (min(meta_data$return_codes) == 0){
     cat("Reading draws from Stan csv output into R (large files take time)...")
     draws_beta <- read_cmdstan_csv(meta_data$output_files, variables = "beta_ind", format = "draws_list")
@@ -2072,6 +2086,178 @@ env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
   } else message("Stan Estimation Did not Finish")
 }
 
+# Update process_HB with new process_HB_fast Oct 2026
+env_stan$process_HB_fast <- function(data_stan, data_model, control_code, meta_data,
+                            predict_task = predict_task_base, pred_list_more = NULL,
+                            task_type = NULL, inv_logit_thresh = NULL,
+                            bin_dir = control_code$dir_run, keep_bin = FALSE,
+                            fastC = TRUE) {
+  # fastC = TRUE runs faster C++ processing, FALSE runs R processing
+  if (min(meta_data$return_codes) != 0) { message("Stan Estimation Did not Finish"); return(invisible(NULL)) }
+  out_prefix <- control_code$out_prefix; dir_run <- control_code$dir_run
+  P <- data_stan$P; I <- data_stan$I; tcm <- t(data_stan$code_master)
+  skip_rows <- if (isTRUE(meta_data$save_warmup) || identical(meta_data$save_warmup, 1)) meta_data$iter_warmup else 0
+  n_scale <- max(data_stan$task_scale_group)
+  nchains <- length(meta_data$output_files) # KL add
+  if (fastC) {
+    mem_vars <- c("accept_stat__", "divergent__", "alpha", "scale_factor_final")
+  } else mem_vars <- c("alpha", "scale_factor_final")
+  if (data_model$check_bad == 1) mem_vars <- c(mem_vars, "prob_bad")
+  if (n_scale > 1) mem_vars <- c(mem_vars, "z_log_scale_xref")
+  
+  # 1. Reading chains in using C (fastC) or standard R --------------------------------------
+  if (fastC) {
+    cat("Streaming Stan csv output using C++ (one pass per chain)...\n")
+    chains <- lapply(1:nchains, function(k) {
+      stan_chain_readwC(meta_data$output_files[k], file.path(bin_dir, paste0(out_prefix, "_beta_chain", k, ".bin")),
+                        P, I, mem_vars, skip_rows, nrows_hint = meta_data$iter_sampling)
+    })
+    if (control_code$export_draws_betas) export_draws_betas_fast(chains, data_stan, out_prefix, dir_run)
+    if (!keep_bin) on.exit(unlink(sapply(chainsC, `[[`, "bin")), add = TRUE) # Removes beta draws files from output
+  } else { # Use R
+    cat("Reading Stan csv output using cmdstanR (large files take time)...")
+    if (control_code$export_draws_betas) {
+      out_file <- file.path(dir_run, paste0(out_prefix, "_draws_beta.csv"))
+      if (file.exists(out_file)) unlink(out_file)
+    }
+    chains <- vector(mode = "list", length = nchains)
+    for (i in 1:nchains){
+      chains[[i]]$draws_beta <- read_cmdstan_csv(meta_data$output_files[i], variables = "beta_ind", sampler_diagnostics = "", format = "draws_matrix")$post_warmup_draws
+      chains[[i]]$mem <- setNames(vector("list", length(mem_vars)), mem_vars)
+      for (j in 1:length(mem_vars)){
+        chains[[i]]$mem[[j]] <- read_cmdstan_csv(meta_data$output_files[i], variables = mem_vars[j], sampler_diagnostics = "", format = "draws_matrix")$post_warmup_draws
+      }
+      chains[[i]]$nrows <- nrow(chains[[i]]$draws_beta); chains[[i]]$ncols <- ncol(chains[[i]]$draws_beta)
+      chains[[i]]$block_mean <- matrix(0,chains[[i]]$nrows,P) # Storage for mean utility each iteration
+      for (iter in (1:chains[[i]]$nrows)){ # mean util each iteration and export
+        iter_util <- matrix(chains[[i]]$draws_beta[iter,],I,P, byrow = TRUE) # Resp x P utilities 1 iteration
+        chains[[i]]$block_mean[iter,] <- colMeans(iter_util)
+        iter_util_full <- as.data.frame(cbind(chain = i, iter = iter, id = data_stan$resp_id, 
+                                              iter_util %*% tcm)) 
+        if (control_code$export_draws_betas) {
+          data.table::fwrite(iter_util_full, out_file, append = file.exists(out_file), col.names = !file.exists(out_file))
+        }
+      }
+      chains[[i]]$diagnostics <-  read_cmdstan_csv(meta_data$output_files[i], variables = "", format = "draws_list")
+      chains[[i]]$mem$accept_stat__ <- chains[[i]]$diagnostics$post_warmup_sampler_diagnostics$`1`$accept_stat__
+      chains[[i]]$mem$divergent_per <- round(100 * mean(chains[[i]]$diagnostics$post_warmup_sampler_diagnostics$`1`$divergent__),1)
+    }
+  } # End of reading chains in C or R
+  ndraws_chain <- sapply(chains, `[[`, "nrows"); ndraws <- sum(ndraws_chain)
+  
+  # 2. Convergence export (== checkconverge_export) ----------------------------
+  vnames <- colnames(data_stan$code_master)
+  cat("\nSaving Results in folder:", dir_run, "\n")
+  message(paste0("\nSaving post warm-up files for:\n convergence stats of mean:     ", out_prefix, "_fit_stats.csv\n",
+                 " PDF of detailed traceplots:    ", out_prefix, "_trace_plots.pdf\n"))
+  
+  draws_beta_mu <- lapply(chains, `[[`, "block_mean")
+  if (control_code$export_draws_means) {
+    draws_beta_mu_export <- do.call(rbind, lapply(seq_len(nchains), function(i) cbind(chain = i, iter = seq_len(nrow(draws_beta_mu[[i]])), draws_beta_mu[[i]])))
+    colnames(draws_beta_mu_export)[3:ncol(draws_beta_mu_export)] <- vnames
+    write.table(draws_beta_mu_export, file = file.path(dir_run, paste0(out_prefix, "_draws_beta_means.csv")), sep = ",", na = ".", row.names = FALSE)
+  }
+  accept <- unlist(lapply(chains, function(ch) ch$mem$accept_stat__))
+  divergent_per <- unlist(lapply(chains, function(ch) ch$mem$divergent_per))
+  
+  if ("draws_beta" %in% control_code$makepdf) {
+    pdf(file = file.path(dir_run, paste0(out_prefix, "_trace_plots.pdf")), width = 7, height = 5)
+    hist(accept, breaks = 30, main = "Acceptance Rate - Sampling", xlab = "", xlim = c(0, 1))
+    for (chain_i in seq_len(nchains)) matplot(seq_len(nrow(draws_beta_mu[[chain_i]])), draws_beta_mu[[chain_i]], type = "l", lty = 1, lwd = 1,
+                                              main = paste0("Chain ", chain_i," Divergent = ", divergent_per[i], "%"),
+                                              xlab = "Iteration", ylab = "Mean Beta")
+    fit_stats <- plot_draws_df(draws = draws_beta_mu, vnames = vnames, ylab = "Mean Beta")
+    dev.off()
+    write.table(fit_stats, file = file.path(dir_run, paste0(out_prefix, "_fit_stats.csv")), sep = ",", na = ".", row.names = FALSE)
+  }
+  
+  # 3. Small vectors ----------------------------------------------------------
+  prob_bad <- NULL
+  if (data_model$check_bad == 1) {
+    prob_bad <- do.call(rbind, lapply(chains, function(ch) ch$mem$prob_bad))
+    check_draws_vector_fast(lapply(chains, function(ch) ch$mem$prob_bad), "prob_bad", "prob_bad_agg", dir_run, out_prefix, "prob_bad" %in% control_code$makepdf)
+  }
+  scale_factor <- as.matrix(do.call(rbind, lapply(chains, function(ch) ch$mem$scale_factor_final)))
+  if (n_scale > 1) check_draws_vector_fast(lapply(chains, function(ch) ch$mem$z_log_scale_xref), "z_log_scale_xref",
+                                           paste0("z_log_scale_xref", 1:(n_scale - 1)), dir_run, out_prefix, "scale_factor" %in% control_code$makepdf)
+  scale_factor_mean <- exp(colMeans(log(scale_factor)))
+  
+  # 4. Respondent loop: one P x ndraws block at a time ---------------------------
+  row_weights <- data_stan$wts[data_stan$idtask_r]; row_holdout <- data_stan$holdout[data_stan$idtask_r]
+  utilities <- matrix(NA, I, P); pred_all <- matrix(NA, data_stan$N, 2); fit_id <- matrix(NA, I, 4)
+  prob_bad_use <- if (is.null(prob_bad)) rep(.0001, ndraws) else prob_bad
+  inv_logit_thresh_resp <- inv_logit_thresh_resp_pt <- NULL
+  for (id in seq_len(I)) {
+    if (!is.null(inv_logit_thresh)) { inv_logit_thresh_resp <- inv_logit_thresh[, id]; inv_logit_thresh_resp_pt <- mean(inv_logit_thresh_resp) }
+    if (fastC) {
+      resp_draws <- resp_draws_fast(chains, id, P)
+    } else {
+      draw_start <- 1 + (id-1) * P
+      draw_end <- draw_start + P - 1
+      resp_draws <- t(do.call(rbind, lapply(chains, function(x) x$draws_beta[,draw_start:draw_end])))
+    }
+    resp_pt_mean <- rowMeans(resp_draws)
+    LL_0 <- log(prob_bad_use); LL_U <- log(1 - prob_bad_use); LL_preds <- c(0, 0); sum_dep <- 0
+    id_specs <- data_stan$id_ranges[id, ]
+    for (t in (id_specs[1]:id_specs[2])) {
+      row_beg <- data_stan$start[t]; row_end <- data_stan$end[t]
+      ind <- data_stan$ind[row_beg:row_end, ]
+      pred_draws_t <- predict_task(t, ind, resp_draws, scale_factor[, data_stan$task_scale_group[t]], task_type, inv_logit_thresh_resp, draws = TRUE, pred_list_more)
+      pred_pt_t <- predict_task(t, ind, resp_pt_mean, scale_factor_mean[data_stan$task_scale_group[t]], task_type, inv_logit_thresh_resp_pt, draws = FALSE, pred_list_more)
+      preds <- cbind(pred_pt_t, rowMeans(pred_draws_t)); pred_all[row_beg:row_end, ] <- preds
+      dep <- data_stan$dep[row_beg:row_end] * data_stan$wts[t] * (1 - data_stan$holdout[t])
+      LL_0 <- LL_0 + (sum(dep) * -log(length(dep))); LL_U <- LL_U + (t(log(pred_draws_t)) %*% dep)
+      LL_preds <- LL_preds + dep %*% log(preds); sum_dep <- sum_dep + sum(dep)
+    }
+    id_prob_good <- if (is.null(prob_bad)) NA else mean(1 / (1 + exp(LL_0 - LL_U)))
+    fit_id[id, ] <- c(exp(LL_preds / sum_dep), id_prob_good, NA)
+    utilities[id, ] <- resp_pt_mean
+  }
+  colnames(fit_id) <- c("rlh_pt", "rlh_draws", "prob_good_hb", "prob_good_LC"); colnames(pred_all) <- c("pred_pt", "pred_draws")
+  
+  # 5. Export (identical to process_HB) -------------------------------------------
+  if (exists("LC_fit") && !is.null(LC_fit)) fit_id[, 4] <- LC_fit$LC_prob_good
+  util_name <- paste0(out_prefix, "_utilities_r.csv"); pred_name <- paste0(out_prefix, "_preds.csv")
+  fit_name <- paste0(out_prefix, "_Hit_LL.csv"); failcon_name <- paste0(out_prefix, "_utilities_failcon.csv")
+  obs_vs_pred_name <- paste0(out_prefix, "_obs_vs_pred.csv")
+  message(paste0("Saving: \n Respondent mean utilities: ", util_name, "\n Predictions for data     : ", pred_name,
+                 "\n Observed vs Predicted    : ", obs_vs_pred_name, "\n Hit Rate and LogLike     : ", fit_name))
+  utilities_r <- utilities %*% t(data_stan$code_master)
+  if (!is.null(inv_logit_thresh)) utilities_r <- cbind(utilities_r, logit_thresh = colMeans(inv_logit_thresh))
+  header <- data.frame(id = data_stan$resp_id, fit_id)
+  write.table(cbind(header, utilities_r), file = file.path(dir_run, util_name), sep = ",", na = ".", row.names = FALSE)
+  pred_all_export <- cbind(data_stan$idtask, holdout = row_holdout, wt = row_weights, dep = data_stan$dep, pred_pt = pred_all[, 1], pred_draws = pred_all[, 2])
+  if (ncol(data_stan$ind_levels) > 0) {
+    ovp <- obs_vs_pred(pred_all_export[, 4:6], data_stan$ind_levels)
+    ovp2 <- obs_vs_pred(pred_all_export[, c(4, 5, 7)], data_stan$ind_levels)
+    ovp$pred_per_draws <- ovp2$pred_per
+    write.table(ovp, file = file.path(dir_run, obs_vs_pred_name), sep = ",", na = ".", row.names = FALSE)
+  } else message("No Categorical Variables found for observed vs predicted")
+  if ("row_in" %in% names(data_stan)) {
+    pred_all_export <- cbind(row_in = data_stan$row_in, pred_all_export); pred_all_export <- pred_all_export[order(data_stan$row_in), ]
+  } else pred_all_export <- cbind(row_in = NA, pred_all_export)
+  write.table(pred_all_export, file = file.path(dir_run, pred_name), sep = ",", na = ".", row.names = FALSE)
+  fit_hit_LL <- cbind(type = "MeanPts", data.frame(hit_rate_LL(pred_all_export, col_id = 2, col_task = 3, col_dep = 6, col_pred = 7, col_split = 4, col_wts = 5)))
+  fit_hit_LL2 <- cbind(type = "Draws", data.frame(hit_rate_LL(pred_all_export, col_id = 2, col_task = 3, col_dep = 6, col_pred = 8, col_split = 4, col_wts = 5)))
+  write.table(rbind(fit_hit_LL, fit_hit_LL2), file = file.path(dir_run, fit_name), sep = ",", na = ".", row.names = FALSE)
+  write.table(scale_factor_mean, file = file.path(dir_run, paste0(out_prefix, "_scale_factor_mean.csv")), sep = ",", na = ".", row.names = FALSE, col.names = FALSE)
+  
+  con_matrix <- diag(data_stan$con_sign)
+  con_matrix <- rbind(con_matrix[rowSums(con_matrix != 0) > 0, , drop = FALSE], data_stan$paircon_matrix)
+  bad_ids <- rowSums(((utilities %*% t(con_matrix)) < 0)) > 0
+  if (sum(bad_ids) > 0) {
+    message(paste0(sum(bad_ids), " Respondents had reversals from constraints.\nReversals saved to: ", failcon_name))
+    write.table(cbind(header, utilities_r)[bad_ids, ], file = file.path(dir_run, failcon_name), sep = ",", na = ".", row.names = FALSE)
+  } else message(" All respondent mean utilities obey constraints")
+  
+  if (control_code$export_draws_alphas) check_draws_vector_fast_fast(lapply(chains, function(ch) ch$mem$alpha), "alpha", colnames(data_stan$ind), dir_run, out_prefix, "alpha" %in% control_code$makepdf)
+  if (data_stan$P_cov > 0) covariate_means <- get_covariates(meta_data$output_files, data_stan, dir_run, out_prefix)  # falls back to a csv re-read
+  if (control_code$est_EB) message("est_EB needs the full draws object; run eb_betas_est separately from the binary files.")
+  
+  invisible(list(utilities = utilities, fit_id = fit_id, pred_all = pred_all, scale_factor_draws = scale_factor,
+                 scale_factor_pts = scale_factor_mean, draws_beta = NULL,
+                 beta_bin = if (fastC & keep_bin) lapply(chains, function(ch) ch[c("bin", "nrows", "ncols")]) else NULL))
+}
 
 env_eb$numder_2 <- function(x, pos, delta = .01){
   # 2nd derivative
@@ -2617,10 +2803,185 @@ env_eb$JeffPrior <- function(xvec, data_list, model_list, ID_Var = FALSE, ObsFis
   return(JeffPrior)
 }
 
+# env_process_wC
+
+# Read in stan output quickly
+# beta_draws are stored on disk (bin_file) and read in when needed
+env_process_wC$stan_chain_stream_wC <- function(file, bin_file, P, I, mem_vars, skip_rows = 0, nrows_hint = 0){
+  Rcpp::sourceCpp(code = '
+#include <Rcpp.h>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <cstdlib>
+#include <cstring>
+using namespace Rcpp;
+
+// One pass over a Stan CSV.
+//  bin_cols : 0-based column indices written row-major to out_bin (draws x length(bin_cols))
+//  mem_cols : 0-based column indices returned as a draws x length(mem_cols) matrix
+//  P, I     : if P > 0, bin_cols are assumed ordered p-fastest within respondent and
+//             a draws x P matrix of means over respondents is returned (block_mean)
+//  skip_rows: data rows to skip at the top (saved warm-up draws)
+// [[Rcpp::export]]
+List stan_stream_cpp(std::string csv, std::string out_bin, IntegerVector bin_cols,
+                     IntegerVector mem_cols, int ncols_total, int P, int I, int skip_rows,
+                     int nrows_hint) {
+  std::vector<int> role(ncols_total, -1);            // -1 ignore, k>=0 -> slot
+  int nb = bin_cols.size(), nm = mem_cols.size();
+  for (int k = 0; k < nb; ++k) role[bin_cols[k]] = k;
+  for (int k = 0; k < nm; ++k) role[mem_cols[k]] = nb + k;
+  std::vector<double> row(nb + nm), colsum(nb, 0.0);
+  std::vector<double> mem; mem.reserve((size_t)nm * (nrows_hint > 0 ? nrows_hint : 1000));
+  std::vector<double> bmean; if (P > 0) bmean.reserve((size_t)P * (nrows_hint > 0 ? nrows_hint : 1000));
+  std::vector<long double> pmean(P > 0 ? P : 0);  // long double: match R mean() accumulation
+  std::ifstream in(csv);
+  if (!in) stop("Cannot open " + csv);
+  std::ofstream out;
+  if (nb > 0) out.open(out_bin, std::ios::binary);
+  std::string line; line.reserve(8 << 20);
+  bool header_done = false; long nrows = 0, data_seen = 0;
+  while (std::getline(in, line)) {
+    if (line.empty() || line[0] == \'#\') continue;
+    if (!header_done) { header_done = true; continue; }
+    if (data_seen++ < skip_rows) continue;
+    const char* p = line.c_str(); int col = 0;
+    while (true) {
+      const char* q = strchr(p, \',\');
+      int r = role[col];
+      if (r >= 0) row[r] = strtod(p, nullptr);
+      ++col;
+      if (!q) break;
+      p = q + 1;
+    }
+    if (col != ncols_total) stop("Row " + std::to_string(nrows + 1) + " has " + std::to_string(col) + " columns, expected " + std::to_string(ncols_total));
+    if (nb > 0) {
+      out.write(reinterpret_cast<const char*>(row.data()), nb * sizeof(double));
+      for (int k = 0; k < nb; ++k) colsum[k] += row[k];
+      if (P > 0) {
+        std::fill(pmean.begin(), pmean.end(), 0.0L);
+        for (int i = 0; i < I; ++i) for (int pp = 0; pp < P; ++pp) pmean[pp] += row[i * P + pp];
+        for (int pp = 0; pp < P; ++pp) bmean.push_back((double)(pmean[pp] / I));
+      }
+    }
+    for (int k = 0; k < nm; ++k) mem.push_back(row[nb + k]);
+    ++nrows;
+  }
+  NumericMatrix mem_m(nrows, nm), bmean_m(nrows, P > 0 ? P : 0);
+  for (long r = 0; r < nrows; ++r) {
+    for (int k = 0; k < nm; ++k) mem_m(r, k) = mem[(size_t)r * nm + k];
+    if (P > 0) for (int pp = 0; pp < P; ++pp) bmean_m(r, pp) = bmean[(size_t)r * P + pp];
+  }
+  return List::create(_["nrows"] = nrows, _["colsum"] = NumericVector(colsum.begin(), colsum.end()),
+                      _["mem"] = mem_m, _["block_mean"] = bmean_m);
+}
+
+// Contiguous column block for all draws from a row-major binary file -> ncol_take x nrows
+// [[Rcpp::export]]
+NumericMatrix bin_slice_cpp(std::string bin, long nrows, int ncols, int col_start, int ncol_take) {
+  NumericMatrix m(ncol_take, nrows);
+  std::ifstream in(bin, std::ios::binary);
+  if (!in) stop("Cannot open " + bin);
+  for (long r = 0; r < nrows; ++r) {
+    in.seekg(((long)r * ncols + col_start) * sizeof(double));
+    in.read(reinterpret_cast<char*>(&m(0, r)), ncol_take * sizeof(double));
+  }
+  return m;
+}')
+  
+  hdr <- stan_csv_header(file)
+  beta_idx <- which(startsWith(hdr, "beta_ind."))
+  if (length(beta_idx) != P * I) stop("beta_ind has ", length(beta_idx), " columns, expected P*I = ", P * I)
+  # Stan orders beta_ind.p.i with p fastest -> respondent blocks of P are contiguous
+  mem_idx <- lapply(mem_vars, function(v) which(hdr == v | startsWith(hdr, paste0(v, "."))))
+  names(mem_idx) <- mem_vars
+  mem_flat <- unlist(mem_idx, use.names = FALSE)
+  res <- stan_stream_cpp(file, bin_file, beta_idx - 1L, mem_flat - 1L, length(hdr), P, I, skip_rows, nrows_hint)
+  mem_split <- list(); pos <- 0
+  for (v in mem_vars) {
+    n <- length(mem_idx[[v]])
+    mem_split[[v]] <- if (n > 0) res$mem[, pos + seq_len(n), drop = FALSE] else NULL
+    if (n > 0) colnames(mem_split[[v]]) <- repair_names_fast(hdr[mem_idx[[v]]])
+    pos <- pos + n
+  }
+  list(bin = bin_file, nrows = res$nrows, ncols = length(beta_idx), colsum = res$colsum,
+       block_mean = res$block_mean, mem = mem_split)
+}
+
+# ---- helpers ---------------------------------------------------------------
+
+env_process_wC$stan_csv_header <- function(file) {
+  con <- file(file, "r"); on.exit(close(con))
+  repeat { l <- readLines(con, n = 1); if (!length(l)) stop("No header in ", file); if (!startsWith(l, "#")) break }
+  strsplit(l, ",", fixed = TRUE)[[1]]
+}
+
+# "alpha.3" -> "alpha[3]", "beta.2.5" -> "beta[2,5]" (same as cmdstanr/posterior naming)
+env_process_wC$repair_names_fast <- function(x) {
+  has_idx <- grepl(".", x, fixed = TRUE)
+  x[has_idx] <- sub("\\.", "[", x[has_idx]); x[has_idx] <- paste0(gsub(".", ",", x[has_idx], fixed = TRUE), "]")
+  x
+}
+
+# Stream one chain. Returns list(bin, nrows, ncols, colsum, block_mean, mem = list(alpha=, ...))
+env_process_wC$stream_stan_chain <- function(file, bin_file, P, I, mem_vars, skip_rows = 0, nrows_hint = 0) {
+  hdr <- stan_csv_header(file)
+  beta_idx <- which(startsWith(hdr, "beta_ind."))
+  if (length(beta_idx) != P * I) stop("beta_ind has ", length(beta_idx), " columns, expected P*I = ", P * I)
+  # Stan orders beta_ind.p.i with p fastest -> respondent blocks of P are contiguous
+  mem_idx <- lapply(mem_vars, function(v) which(hdr == v | startsWith(hdr, paste0(v, "."))))
+  names(mem_idx) <- mem_vars
+  mem_flat <- unlist(mem_idx, use.names = FALSE)
+  res <- stan_stream_cpp(file, bin_file, beta_idx - 1L, mem_flat - 1L, length(hdr), P, I, skip_rows, nrows_hint)
+  mem_split <- list(); pos <- 0
+  for (v in mem_vars) {
+    n <- length(mem_idx[[v]])
+    mem_split[[v]] <- if (n > 0) res$mem[, pos + seq_len(n), drop = FALSE] else NULL
+    if (n > 0) colnames(mem_split[[v]]) <- repair_names_fast(hdr[mem_idx[[v]]])
+    pos <- pos + n
+  }
+  list(bin = bin_file, nrows = res$nrows, ncols = length(beta_idx), colsum = res$colsum,
+       block_mean = res$block_mean, mem = mem_split)
+}
+
+# P x (sum of draws over chains) block for respondent id, chains concatenated in file order
+env_process_wC$resp_draws_fast <- function(chains, id, P) {
+  do.call(cbind, lapply(chains, function(ch) bin_slice_cpp(ch$bin, ch$nrows, ch$ncols, (id - 1L) * P, P)))
+}
+
+
+
+# Streaming equivalent of the export_draws_betas branch of checkconverge_export.
+# Original: saveRDS of rbind over chains/iterations of cbind(chain, iter, id, beta %*% t(code_master)).
+# Here the same rows, in the same order, are appended to <out_prefix>_draws_beta.csv one
+# block of draws at a time, so memory is block_draws x I x P instead of all draws.
+env_process_wC$export_draws_betas_fast <- function(chains, data_stan, out_prefix, dir_run, block_draws = 10) {
+  out_file <- file.path(dir_run, paste0(out_prefix, "_draws_beta.csv"))
+  if (file.exists(out_file)) unlink(out_file)
+  P <- data_stan$P; I <- data_stan$I; tcm <- t(data_stan$code_master)
+  message(" Stacked respondent draws:      ", basename(out_file), " (csv, streamed)")
+  for (k in seq_along(chains)) {
+    ch <- chains[[k]]; con <- file(ch$bin, "rb")
+    iter <- 0
+    while (iter < ch$nrows) {
+      nb <- min(block_draws, ch$nrows - iter)
+      vals <- readBin(con, "double", n = nb * ch$ncols)
+      block <- do.call(rbind, lapply(seq_len(nb), function(j) {
+        util <- matrix(vals[(j - 1) * ch$ncols + seq_len(ch$ncols)], I, P, byrow = TRUE)  # first P values = resp 1
+        cbind(chain = k, iter = iter + j, id = data_stan$resp_id, util %*% tcm)
+      }))
+      data.table::fwrite(block, out_file, append = file.exists(out_file), col.names = !file.exists(out_file))
+      iter <- iter + nb
+    }
+    close(con)
+  }
+  invisible(out_file)
+}
 
 # Do not attach multiple times -- detach first
 attach(env_code)
 attach(env_modfun)
 attach(env_eb)
 attach(env_stan)
+attach(env_process_wC)
 
