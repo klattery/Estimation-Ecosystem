@@ -2113,7 +2113,7 @@ env_stan$process_HB_fast <- function(data_stan, data_model, control_code, meta_d
                         P, I, mem_vars, skip_rows, nrows_hint = meta_data$iter_sampling)
     })
     if (control_code$export_draws_betas) export_draws_betas_fast(chains, data_stan, out_prefix, dir_run)
-    if (!keep_bin) on.exit(unlink(sapply(chainsC, `[[`, "bin")), add = TRUE) # Removes beta draws files from output
+    if (!keep_bin) on.exit(unlink(sapply(chains, `[[`, "bin")), add = TRUE) # Removes beta draws files from output
   } else { # Use R
     cat("Reading Stan csv output using cmdstanR (large files take time)...")
     if (control_code$export_draws_betas) {
