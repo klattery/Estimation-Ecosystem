@@ -2250,7 +2250,7 @@ env_stan$process_HB_fast <- function(data_stan, data_model, control_code, meta_d
     write.table(cbind(header, utilities_r)[bad_ids, ], file = file.path(dir_run, failcon_name), sep = ",", na = ".", row.names = FALSE)
   } else message(" All respondent mean utilities obey constraints")
   
-  if (control_code$export_draws_alphas) check_draws_vector_fast_fast(lapply(chains, function(ch) ch$mem$alpha), "alpha", colnames(data_stan$ind), dir_run, out_prefix, "alpha" %in% control_code$makepdf)
+  if (control_code$export_draws_alphas) check_draws_vector_fast(lapply(chains, function(ch) ch$mem$alpha), "alpha", colnames(data_stan$ind), dir_run, out_prefix, "alpha" %in% control_code$makepdf)
   if (data_stan$P_cov > 0) covariate_means <- get_covariates(meta_data$output_files, data_stan, dir_run, out_prefix)  # falls back to a csv re-read
   if (control_code$est_EB) message("est_EB needs the full draws object; run eb_betas_est separately from the binary files.")
   
