@@ -2967,10 +2967,10 @@ env_process_wC$export_draws_betas_fast <- function(chains, data_stan, out_prefix
     while (iter < ch$nrows) {
       nb <- min(block_draws, ch$nrows - iter)
       vals <- readBin(con, "double", n = nb * ch$ncols)
-      block <- do.call(rbind, lapply(seq_len(nb), function(j) {
+      block <- as.data.frame(do.call(rbind, lapply(seq_len(nb), function(j) {
         util <- matrix(vals[(j - 1) * ch$ncols + seq_len(ch$ncols)], I, P, byrow = TRUE)  # first P values = resp 1
         cbind(chain = k, iter = iter + j, id = data_stan$resp_id, util %*% tcm)
-      }))
+      })))
       data.table::fwrite(block, out_file, append = file.exists(out_file), col.names = !file.exists(out_file))
       iter <- iter + nb
     }
