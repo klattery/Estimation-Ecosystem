@@ -2111,6 +2111,7 @@ env_stan$process_HB_fast <- function(data_stan, data_model, control_code, meta_d
     chains <- lapply(1:nchains, function(k) {
       stan_chain_readwC(meta_data$output_files[k], file.path(bin_dir, paste0(out_prefix, "_beta_chain", k, ".bin")),
                         P, I, mem_vars, skip_rows, nrows_hint = meta_data$iter_sampling)
+    for (i in 1:nchains){chains[[i]]$mem$divergent_per <- round(100 * mean(chains[[i]]$mem$divergent__),1)}   
     })
     if (control_code$export_draws_betas) export_draws_betas_fast(chains, data_stan, out_prefix, dir_run)
     if (!keep_bin) on.exit(unlink(sapply(chains, `[[`, "bin")), add = TRUE) # Removes beta draws files from output
