@@ -1954,11 +1954,11 @@ env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
     if (data_model$check_bad == 1){
       prob_bad <- read_cmdstan_csv(meta_data$output_files, variables = "prob_bad", format = "draws_list")
       prob_bad <- do.call(rbind, lapply(prob_bad$post_warmup_draws, function(x) do.call(cbind, x)))  # draws x n_scales
-      check_draws_vector(meta_data$output_files, "prob_bad", "prob_bad_agg", control_code$dir_run, control_code$out_prefix,makepdf = ("prob_bad" %in% control_code$makepdf))
+      check_draws_vector_fast(meta_data$output_files, "prob_bad", "prob_bad_agg", control_code$dir_run, control_code$out_prefix,makepdf = ("prob_bad" %in% control_code$makepdf))
     } else prob_bad <- NULL
     scale_factor_list <- read_cmdstan_csv(meta_data$output_files, variables = "scale_factor_final", format = "draws_list")
     scale_factor <- do.call(rbind, lapply(scale_factor_list$post_warmup_draws, function(x) do.call(cbind, x)))  # draws x n_scales
-    if (max(data_stan$task_scale_group > 1)) check_draws_vector(meta_data$output_files, "z_log_scale_xref",
+    if (max(data_stan$task_scale_group > 1)) check_draws_vector_fast(meta_data$output_files, "z_log_scale_xref",
                                                                 paste0("z_log_scale_xref",1:(max(data_stan$task_scale_group)-1)),
                                                                 control_code$dir_run, control_code$out_prefix,makepdf = ("scale_factor" %in% control_code$makepdf))
     out_prefix <- control_code$out_prefix
@@ -2072,7 +2072,7 @@ env_stan$process_HB <- function(data_stan, data_model, control_code, meta_data,
       write.table(cbind(header, utilities_r)[bad_ids,], file = file.path(dir_run, failcon_name), sep = ",", na = ".", row.names = FALSE)
     } else message(" All respondent mean utilities obey constraints")
     
-    if (control_code$export_draws_alphas) check_draws_vector(meta_data$output_files, "alpha", colnames(data_stan$ind), control_code$dir_run, control_code$out_prefix, makepdf = ("alpha" %in% control_code$makepdf))
+    if (control_code$export_draws_alphas) check_draws_vector_fast(meta_data$output_files, "alpha", colnames(data_stan$ind), control_code$dir_run, control_code$out_prefix, makepdf = ("alpha" %in% control_code$makepdf))
     if (data_stan$P_cov > 0) covariate_means <- get_covariates(meta_data$output_files, data_stan, control_code$dir_run, control_code$out_prefix)
     if (control_code$est_EB & exists("draws_beta") & exists("data_stan")){
       linux <- (Sys.info()[1] != "Windows")
