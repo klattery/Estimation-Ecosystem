@@ -2807,7 +2807,7 @@ env_eb$JeffPrior <- function(xvec, data_list, model_list, ID_Var = FALSE, ObsFis
 
 # Read in stan output quickly
 # beta_draws are stored on disk (bin_file) and read in when needed
-env_process_wC$stan_chain_read_wC <- function(file, bin_file, P, I, mem_vars, skip_rows = 0, nrows_hint = 0){
+env_process_wC$stan_chain_readwC <- function(file, bin_file, P, I, mem_vars, skip_rows = 0, nrows_hint = 0){
   Rcpp::sourceCpp(code = '
 #include <Rcpp.h>
 #include <fstream>
