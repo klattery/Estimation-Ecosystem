@@ -858,7 +858,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
                                     data_cov, specs_cov_coding,
                                     check_collinearity = FALSE, other_data = NULL,
                                     force_sumtask_dep1 = TRUE,
-                                    holdouts = 0, seed = NULL, stan_path = FALSE) {
+                                    holdouts = 0, seed = NULL) {
   result <- list(tag = 0, N = 0, P = 0, I = 0, T = 0, dep = 0, ind = 0, sizes = 0,
                  code_master = indcode_list$code_master, n_atts = nrow(indcode_list$code_blocks), code_blocks = indcode_list$code_blocks)
   sort_order <- order(idtaskdep[, 1], idtaskdep[, 2], -idtaskdep[,3])
@@ -994,8 +994,7 @@ env_stan$prep_file_stan <- function(idtaskdep, indcode_list, train = TRUE,
     x0 = x_initial$par,
     threads_rec = min(max(1,(detectCores() - 2)/2), round(.5 + result$T/500), round(.5 + result$I/16)),
     idtask = idtask, idtask_r = idtask_r,
-    resp_id = resp_id, match_id = match_id,
-    if(stan_path) data_stan_path = file.path(dir$stanmodel, paste0("data_stan_",control_code$out_prefix, "_", format(Sys.time(), '%y%m%d-%H%M%S'),".rds"))
+    resp_id = resp_id, match_id = match_id
   ))) 
 }
   
